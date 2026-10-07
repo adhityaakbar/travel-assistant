@@ -1,0 +1,65 @@
+name: Deploy Travel Assistant to LXC g4-apps
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Install Cloudflared on Runner
+        run: |
+          curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+
+      - name: Deploy to LXC g4-apps via SSH & PM2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          proxy_host: ""
+          proxy_username: ""
+          proxy_key: ""
+          proxy_passphrase: ""
+          script: |
+            mkdir -p /var/www/travelassistant
+            cd /var/www/travelassistant
+            
+            # Pull latest changes or clone if not present
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/adhityaakbar/travel-assistant.git .
+            else
+              git fetch origin main
+              git reset --hard origin/main
+            fi
+
+            # Install and Build
+            npm install
+            npm run build
+
+            # Ensure PM2 manages Travel Assistant on Port 3000
+            pm2 delete travel-assistant 2>/dev/null || true
+            pm2 start npm --name "travel-assistant" -- start
+            pm2 save
+            
+            # Restart Nginx
+            systemctl reload nginx

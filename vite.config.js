@@ -10,6 +10,7 @@ export default defineConfig({
   },
   preview: {
     port: 3000,
-    host: true
+    host: true,
+    allowedHosts: ['g4-travelapps.aneta.my.id', 'localhost', '127.0.0.1']
   }
 })
