@@ -20,7 +20,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Application
         run: npm run build
@@ -30,36 +30,47 @@ jobs:
           curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
           sudo dpkg -i cloudflared.deb
 
-      - name: Deploy to LXC g4-apps via SSH & PM2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          proxy_host: ""
-          proxy_username: ""
-          proxy_key: ""
-          proxy_passphrase: ""
-          script: |
+      - name: Deploy to LXC g4-apps via SSH (Cloudflare Tunnel)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # Configure SSH to proxy through cloudflared
+          cat << EOF >> ~/.ssh/config
+          Host $DEPLOY_HOST
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+            ProxyCommand cloudflared access ssh --hostname %h
+          EOF
+
+          # Execute remote deployment commands
+          ssh $DEPLOY_HOST "
+            set -e
+            echo '==> Deploying to /var/www/travelassistant...'
             mkdir -p /var/www/travelassistant
             cd /var/www/travelassistant
-            
-            # Pull latest changes or clone if not present
-            if [ ! -d ".git" ]; then
+
+            if [ ! -d '.git' ]; then
               git clone https://github.com/adhityaakbar/travel-assistant.git .
             else
               git fetch origin main
               git reset --hard origin/main
             fi
 
-            # Install and Build
+            echo '==> Installing dependencies & building...'
             npm install
             npm run build
 
-            # Ensure PM2 manages Travel Assistant on Port 3000
+            echo '==> Reloading PM2 & Nginx...'
             pm2 delete travel-assistant 2>/dev/null || true
-            pm2 start npm --name "travel-assistant" -- start
+            pm2 start server/index.js --name 'travel-assistant'
             pm2 save
-            
-            # Restart Nginx
             systemctl reload nginx
+            echo '==> Deployment successful!'
+          "
