@@ -271,14 +271,17 @@ export default function App() {
   const startCamera = async (mode = facingMode) => {
     stopCamera();
     setScanError('');
+    setIsCameraActive(true);
     try {
-      await cameraControllerRef.current.start({
-        getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
-        video: videoRef.current,
-        facingMode: { ideal: mode },
-        ...cameraState(),
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: mode } }
       });
-      await videoRef.current?.play();
+      cameraStreamRef.current = stream;
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
     } catch (err) {
       console.error('Kamera error:', err);
       // Fallback ke kamera depan jika kamera belakang ideal gagal
