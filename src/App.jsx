@@ -452,8 +452,9 @@ export default function App() {
     }
   };
 
-  const translateMessage = async () => {
-    if (isEmptyInput(inputText)) {
+  const translateMessage = async (overrideText = null) => {
+    const textToTranslate = overrideText !== null ? overrideText : inputText;
+    if (isEmptyInput(textToTranslate)) {
       setChatError('Masukkan kalimat untuk diterjemahkan.');
       return;
     }
@@ -461,8 +462,16 @@ export default function App() {
     setChatError('');
     setTranslatedText('');
     setTranslationSnapshot(null);
+
+    // Default target ke Bahasa Jepang jika target saat ini sama dengan source (id)
+    let currentTarget = targetLanguage;
+    if (sourceLanguage === 'id' && targetLanguage === 'id') {
+      currentTarget = 'ja';
+      setTargetLanguage('ja');
+    }
+
     const requestId = ++translationRequestIdRef.current;
-    const request = { text: inputText.trim(), source_language: sourceLanguage, target_language: targetLanguage };
+    const request = { text: textToTranslate.trim(), source_language: sourceLanguage, target_language: currentTarget };
     try {
       const res = await axios.post('/api/chat/translate', request, { headers: { Authorization: `Bearer ${token}` } });
       if (!applyLatestTranslationState(requestId, translationRequestIdRef.current, () => {
@@ -1297,7 +1306,7 @@ export default function App() {
                       <button 
                         onClick={() => {
                           setInputText(phrase.text);
-                          translateMessage();
+                          translateMessage(phrase.text);
                         }}
                         className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold shrink-0 transition"
                       >
