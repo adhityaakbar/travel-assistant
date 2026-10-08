@@ -90,10 +90,12 @@ export default function App() {
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
 
+  const DEFAULT_TOKYO_LOCATION = { lat: 35.6595, lng: 139.7004 }; // Shibuya Scramble, Tokyo
+
   // Spot Kalcer State
-  const [userLocation, setUserLocation] = useState(null);
+  const [userLocation, setUserLocation] = useState(DEFAULT_TOKYO_LOCATION);
   const [locatingUser, setLocatingUser] = useState(false);
-  const [locationStatus, setLocationStatus] = useState('Tekan GPS Saya untuk mencari spot di sekitar Anda.');
+  const [locationStatus, setLocationStatus] = useState('📍 Spot Tokyo (Rekomendasi)');
   const [spotFilter, setSpotFilter] = useState('all');
   const [spotsList, setSpotsList] = useState([]);
   const [loadingSpots, setLoadingSpots] = useState(false);
@@ -265,7 +267,16 @@ export default function App() {
 
   useEffect(() => {
     if (activeTab === 'scanner') loadScanHistory();
-    if (activeTab === 'ngobrol') loadChatHistory();
+    if (activeTab === 'ngobrol') {
+      loadChatHistory();
+      // Default Ngobrol: Bahasa Indonesia -> Bahasa Jepang
+      setSourceLanguage('id');
+      setTargetLanguage('ja');
+    }
+    if (activeTab === 'kalcer') {
+      const targetLoc = userLocation || DEFAULT_TOKYO_LOCATION;
+      loadSpots(targetLoc.lat, targetLoc.lng, spotFilter);
+    }
   }, [activeTab]);
 
   const startCamera = async (mode = facingMode) => {
@@ -466,11 +477,11 @@ export default function App() {
     setTranslatedText('');
     setTranslationSnapshot(null);
 
-    // Default target ke Bahasa Jepang jika target saat ini sama dengan source (id)
+    // Default target ke Bahasa Jepang jika target saat ini sama dengan source
     let currentTarget = targetLanguage;
-    if (sourceLanguage === 'id' && targetLanguage === 'id') {
-      currentTarget = 'ja';
-      setTargetLanguage('ja');
+    if (sourceLanguage === currentTarget) {
+      currentTarget = sourceLanguage === 'id' ? 'ja' : 'id';
+      setTargetLanguage(currentTarget);
     }
 
     const requestId = ++translationRequestIdRef.current;
