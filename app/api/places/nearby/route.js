@@ -93,8 +93,8 @@ export function createNearbyHandler({ curatedSpots = CURATED_SPOTS, apiKey = pro
           .sort((a, b) => b.popularityScore - a.popularityScore)
           .slice(0, 20);
         return NextResponse.json({ location: { lat, lng }, category, count: normalized.length, places: normalized, source: 'provider', ...(normalized.length ? {} : { providerStatus: 'empty' }) });
-      } catch {
-        return NextResponse.json({ error: 'Layanan tempat terdekat sedang bermasalah. Coba lagi.' }, { status: 502 });
+      } catch (googleErr) {
+        console.warn('Google Places API Error/Timeout, falling back to curated spots:', googleErr?.response?.data || googleErr?.message);
       }
     }
 

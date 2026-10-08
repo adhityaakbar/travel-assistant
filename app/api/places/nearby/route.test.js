@@ -79,8 +79,10 @@ test('provider empty result stays empty instead of fabricating fallback', async 
   assert.deepEqual(await response.json(), { location: { lat: 35, lng: 139 }, category: 'all', count: 0, places: [], source: 'provider', providerStatus: 'empty' });
 });
 
-test('provider failure returns safe actionable response', async () => {
-  const response = await handler({ apiKey: 'configured', searchPlaces: async () => { throw new Error('secret provider detail'); } })(request('?lat=35&lng=139&category=all'));
-  assert.equal(response.status, 502);
-  assert.deepEqual(await response.json(), { error: 'Layanan tempat terdekat sedang bermasalah. Coba lagi.' });
+test('provider failure falls back gracefully to curated spots', async () => {
+  const response = await handler({ apiKey: 'fake_key', searchPlaces: async () => { throw new Error('secret provider detail'); } })(request('?lat=35.001&lng=139&category=all'));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.source, 'curated');
+  assert.ok(body.places.length > 0);
 });
