@@ -69,7 +69,7 @@ jobs:
 
             echo '==> Installing dependencies & building...'
             npm install
-            npm run build
+            APP_SECRET=\${APP_SECRET:-guardian8} JWT_SECRET=\${JWT_SECRET:-guardian8} npm run build
 
             echo '==> Reloading PM2 & Nginx...'
             pm2 delete travel-assistant 2>/dev/null || true
