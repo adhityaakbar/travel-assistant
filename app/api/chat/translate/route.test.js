@@ -22,6 +22,6 @@ test('translate returns normalized response', async () => {
 });
 
 test('translate hides provider failure', async () => {
-  const response = await createTranslateHandler({ authenticate: owner, translate: async () => { throw new Error('secret-key provider body'); } }).POST(request({ text: 'halo', source_language: 'id', target_language: 'ja' }));
+  const response = await createTranslateHandler({ authenticate: owner, translate: async () => { throw new Error('secret-key provider body'); } }).POST(request({ text: 'halo error test', source_language: 'id', target_language: 'ja' }));
   assert.equal(response.status, 502); assert.doesNotMatch(await response.text(), /secret-key|provider body/);
 });

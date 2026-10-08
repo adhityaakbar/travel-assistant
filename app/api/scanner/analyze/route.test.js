@@ -82,30 +82,21 @@ test('provider failure returns 502 and does not insert', async () => {
   assert.deepEqual(await response.json(), { error: 'Gagal menganalisis gambar' });
 });
 
-test('analyzes and saves normalized fields as an estimate', async () => {
+test('analyzes and returns normalized fields as an un-saved estimate', async () => {
   let analyzedImage;
-  let insert;
-  const saved = { id: 7, ...analysis, is_estimate: true, created_at: '2026-10-07T00:00:00.000Z' };
   const response = await handler({
     analyze: async ({ imageDataUrl: value }) => { analyzedImage = value; return analysis; },
-    query: async (text, values) => { insert = { text, values }; return { rows: [saved] }; },
   })(request({ image_data_url: imageDataUrl }));
 
-  assert.equal(response.status, 201);
+  assert.equal(response.status, 200);
   assert.equal(analyzedImage, imageDataUrl);
-  assert.match(insert.text, /INSERT INTO scan_history/);
-  assert.match(insert.text, /is_estimate/);
-  assert.deepEqual(insert.values, [
-    analysis.product_name, analysis.brand, analysis.model, analysis.price_jpy,
-    analysis.lowest_price_idr, analysis.average_price_idr, analysis.currency,
-    analysis.marketplace, analysis.marketplace_url, analysis.tokopedia_url,
-    analysis.shopee_url, analysis.confidence, analysis.estimate_note, true,
-    null, null, null
-  ]);
-  assert.deepEqual(await response.json(), { success: true, item: saved });
+  const data = await response.json();
+  assert.equal(data.success, true);
+  assert.equal(data.item.product_name, analysis.product_name);
+  assert.equal(data.item.is_estimate, true);
 });
 
-test('history POST cannot bypass analysis', async () => {
-  const response = await historyPost();
-  assert.equal(response.status, 405);
+test('history POST rejects unauthenticated requests', async () => {
+  const response = await historyPost(new Request('http://localhost/api/scanner/history', { method: 'POST' }));
+  assert.equal(response.status, 401);
 });

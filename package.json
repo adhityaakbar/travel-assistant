@@ -1,13 +1,13 @@
 {
   "name": "travel-assistant",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "dev:https": "next dev --experimental-https-key ./certificates/key.pem --experimental-https-cert ./certificates/cert.pem",
+    "dev:https": "next dev -H 0.0.0.0 --experimental-https --experimental-https-key ./certificates/key.pem --experimental-https-cert ./certificates/cert.pem",
     "dev:https:auto": "next dev --experimental-https",
-    "dev:clean": "pkill -f 'next dev' || true; rm -rf .next && npm run build && npm run dev",
+    "dev:clean": "./scripts/dev-clean.sh",
     "build": "next build",
     "start": "next start",
     "test": "node --test",

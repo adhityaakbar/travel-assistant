@@ -1,10 +1,25 @@
 import { NextResponse } from 'next/server.js';
 
+const ttsCache = new Map();
+
 export async function POST(request) {
   try {
     const { text, language } = await request.json();
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Teks wajib diisi' }, { status: 400 });
+    }
+
+    const textToSynthesize = text.slice(0, 500).trim();
+    const cacheKey = `${language || 'default'}:${textToSynthesize}`;
+    if (ttsCache.has(cacheKey)) {
+      return new NextResponse(ttsCache.get(cacheKey), {
+        status: 200,
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=86400',
+          'X-TTS-Cache': 'HIT'
+        },
+      });
     }
 
     const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -37,11 +52,13 @@ export async function POST(request) {
     }
 
     const audioBuffer = await response.arrayBuffer();
+    ttsCache.set(cacheKey, audioBuffer);
     return new NextResponse(audioBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',
         'Cache-Control': 'public, max-age=86400',
+        'X-TTS-Cache': 'MISS'
       },
     });
   } catch (err) {

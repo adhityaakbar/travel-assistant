@@ -73,13 +73,21 @@ export default function App() {
   const [scanHistoryList, setScanHistoryList] = useState([]);
   const [scanLoading, setScanLoading] = useState(false);
   const [scanError, setScanError] = useState('');
+  const [scanSaving, setScanSaving] = useState(false);
+  const [scannedResultSaved, setScannedResultSaved] = useState(false);
 
   // Ngobrol State
   const [selectedPhraseCategory, setSelectedPhraseCategory] = useState('Semua');
   const translationRequestIdRef = useRef(0);
   const recognitionRef = useRef(null);
+  const speechTranscriptRef = useRef('');
+  const speechStopRequestedRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [inputText, setInputText] = useState('');
+  const inputTextRef = useRef(inputText);
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
   const [translatedText, setTranslatedText] = useState('');
   const [sourceLanguage, setSourceLanguage] = useState('id');
   const [targetLanguage, setTargetLanguage] = useState('ja');
@@ -90,10 +98,23 @@ export default function App() {
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
 
+  // Header Permission State
+  const [hasAllPermissions, setHasAllPermissions] = useState(false);
+
   const DEFAULT_JAKSEL_LOCATION = { lat: -6.2615, lng: 106.8106 }; // Jakarta Selatan
 
   // Spot Kalcer State
-  const [userLocation, setUserLocation] = useState(null);
+  const [userLocation, setUserLocation] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('travel_assistant_user_location');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return null;
+  });
   const [locatingUser, setLocatingUser] = useState(false);
   const [locationStatus, setLocationStatus] = useState('Meminta lokasi GPS...');
   const [spotFilter, setSpotFilter] = useState('all');
@@ -102,17 +123,26 @@ export default function App() {
   const [countryCode, setCountryCode] = useState('JPN');
   const [customCategories, setCustomCategories] = useState([]);
   const [newCatInput, setNewCatInput] = useState('');
+  const [showAddCatModal, setShowAddCatModal] = useState(false);
   // Quick Phrases CRUD state
   const [phrasesList, setPhrasesList] = useState(QUICK_PHRASES);
   const [editingPhraseIndex, setEditingPhraseIndex] = useState(null);
   const [phraseModalOpen, setPhraseModalOpen] = useState(false);
   const [phraseInputText, setPhraseInputText] = useState('');
   const [phraseInputCategory, setPhraseInputCategory] = useState('🗣️ Dasar');
+  const [phraseSearchQuery, setPhraseSearchQuery] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [showAllHistoryModal, setShowAllHistoryModal] = useState(false);
 
-  // 1. Initial Load: Auto request GPS location, Auth Token & Initial Data
+  // 1. Initial Load: Auth Token & Initial Data
   useEffect(() => {
-    requestUserLocation();
     if (token) {
+      if (!userLocation) {
+        requestUserLocation();
+      } else {
+        setLocationStatus(`📍 GPS: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`);
+        setCountryCode(getCountryCodeFromCoords(userLocation.lat, userLocation.lng));
+      }
       axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         .then(res => {
           setUser(res.data.user);
@@ -144,6 +174,7 @@ export default function App() {
         localStorage.setItem('travel_assistant_token', res.data.token);
         setToken(res.data.token);
         setUser(res.data.user);
+        requestUserLocation();
       }
     } catch (err) {
       setLoginError(err.response?.data?.error || 'Gagal login. Pastikan passcode benar.');
@@ -290,10 +321,11 @@ export default function App() {
     }
   }, [activeTab]);
 
-  const startCamera = async (mode = facingMode) => {
+  const startCamera = async (overrideMode = null) => {
     stopCamera();
     setScanError('');
     setIsCameraActive(true);
+    const mode = overrideMode || facingMode || 'environment';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: mode } }
@@ -319,6 +351,32 @@ export default function App() {
       setScanError(message);
       stopCamera();
     }
+  };
+
+  const checkPermissionsState = async () => {
+    if (typeof window === 'undefined' || !navigator.permissions) return;
+    try {
+      let locGranted = false;
+      let camGranted = false;
+      let micGranted = false;
+
+      try {
+        const locP = await navigator.permissions.query({ name: 'geolocation' });
+        locGranted = locP.state === 'granted';
+      } catch {}
+
+      try {
+        const camP = await navigator.permissions.query({ name: 'camera' });
+        camGranted = camP.state === 'granted';
+      } catch {}
+
+      try {
+        const micP = await navigator.permissions.query({ name: 'microphone' });
+        micGranted = micP.state === 'granted';
+      } catch {}
+
+      setHasAllPermissions(locGranted && camGranted && micGranted);
+    } catch {}
   };
 
   const requestAllPermissions = async () => {
@@ -355,6 +413,8 @@ export default function App() {
     } else {
       setChatError(micRes.error);
     }
+
+    await checkPermissionsState();
   };
 
   const toggleCameraFacing = () => {
@@ -423,32 +483,29 @@ export default function App() {
       }, { headers: { Authorization: `Bearer ${token}` } });
       const item = res.data.item;
       setScannedResult({ ...item, image_url: imageDataUrl, latitude: photoLat, longitude: photoLng, location_name: photoLocName });
-
-      // Auto save scan result to history if token is present
-      if (token && item && item.product_name) {
-        try {
-          await axios.post('/api/scanner/history', {
-            product_name: item.product_name,
-            price_jpy: item.price_jpy || 0,
-            lowest_price_idr: item.lowest_price_idr || 0,
-            average_price_idr: item.average_price_idr || 0,
-            tokopedia_url: item.tokopedia_url || null,
-            shopee_url: item.shopee_url || null,
-            image_url: imageDataUrl,
-            latitude: photoLat,
-            longitude: photoLng,
-            location_name: photoLocName
-          }, { headers: { Authorization: `Bearer ${token}` } });
-        } catch (saveErr) {
-          console.warn('Auto save scan history warning:', saveErr);
-        }
-      }
-
-      await loadScanHistory();
+      setScannedResultSaved(false);
     } catch (err) {
       setScanError(err.response?.data?.error || 'Analisis gagal. Coba foto lebih jelas atau unggah gambar lain.');
     } finally {
       setScanLoading(false);
+    }
+  };
+
+  const saveScannedResultToHistory = async () => {
+    if (!scannedResult || scanSaving) return;
+    setScanSaving(true);
+    try {
+      await axios.post('/api/scanner/history', scannedResult, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setScannedResultSaved(true);
+      await loadScanHistory();
+    } catch (err) {
+      console.warn('Scan history save error:', err);
+      setScannedResultSaved(true);
+      await loadScanHistory();
+    } finally {
+      setScanSaving(false);
     }
   };
 
@@ -475,6 +532,16 @@ export default function App() {
     }
   };
 
+  const loadItemToChat = (item) => {
+    setChatMessages(prev => [...prev, {
+      id: item.id || Date.now(),
+      sourceText: item.source_text || item.sourceText,
+      sourceLanguage: item.source_language || item.sourceLanguage,
+      targetLanguage: item.target_language || item.targetLanguage,
+      translatedText: item.translated_text || item.translatedText
+    }]);
+  };
+
   const translateMessage = async (overrideText = null) => {
     const textToTranslate = overrideText !== null ? overrideText : inputText;
     if (isEmptyInput(textToTranslate)) {
@@ -483,8 +550,6 @@ export default function App() {
     }
     setChatLoading(true);
     setChatError('');
-    setTranslatedText('');
-    setTranslationSnapshot(null);
 
     // Default target ke Bahasa Jepang jika target saat ini sama dengan source
     let currentTarget = targetLanguage;
@@ -501,6 +566,13 @@ export default function App() {
         const translation = res.data.translation || '';
         setTranslatedText(translation);
         setTranslationSnapshot({ sourceText: request.text, sourceLanguage: request.source_language, targetLanguage: request.target_language, translatedText: translation });
+        loadItemToChat({
+          source_text: request.text,
+          source_language: request.source_language,
+          target_language: request.target_language,
+          translated_text: translation
+        });
+        setInputText('');
       })) return;
     } catch (err) {
       applyLatestTranslationState(requestId, translationRequestIdRef.current, () => {
@@ -525,14 +597,32 @@ export default function App() {
     setTranslationSnapshot(null);
   };
 
-  const saveChat = async () => {
-    if (!isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)) return;
+  const saveChat = async (msgToSave = null) => {
+    const payload = msgToSave ? {
+      sourceText: msgToSave.sourceText || msgToSave.source_text,
+      sourceLanguage: msgToSave.sourceLanguage || msgToSave.source_language,
+      translatedText: msgToSave.translatedText || msgToSave.translated_text,
+      targetLanguage: msgToSave.targetLanguage || msgToSave.target_language
+    } : translationSnapshot ? {
+      sourceText: translationSnapshot.sourceText,
+      sourceLanguage: translationSnapshot.sourceLanguage,
+      translatedText: translationSnapshot.translatedText,
+      targetLanguage: translationSnapshot.targetLanguage
+    } : chatMessages.length > 0 ? {
+      sourceText: chatMessages[chatMessages.length - 1].sourceText,
+      sourceLanguage: chatMessages[chatMessages.length - 1].sourceLanguage,
+      translatedText: chatMessages[chatMessages.length - 1].translatedText,
+      targetLanguage: chatMessages[chatMessages.length - 1].targetLanguage
+    } : null;
+
+    if (!payload || !payload.sourceText || !payload.translatedText) return;
     setChatSaving(true);
     try {
-      await axios.post('/api/chat/history', conversationPayload({
-        sourceText: inputText.trim(), sourceLanguage, translatedText, targetLanguage
-      }), { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('/api/chat/history', conversationPayload(payload), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       await loadChatHistory();
+      setChatError('');
     } catch (err) {
       setChatError(err.response?.data?.error || 'Percakapan gagal disimpan.');
     } finally {
@@ -550,6 +640,16 @@ export default function App() {
     }
   };
 
+  const deleteScanHistoryItem = async (id) => {
+    if (!window.confirm('Hapus riwayat scanner ini?')) return;
+    try {
+      await axios.delete(`/api/scanner/history/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await loadScanHistory();
+    } catch (err) {
+      console.warn('Gagal menghapus scan history:', err);
+    }
+  };
+
   // 4. Kalcer Geolocation & Places API Integration
   const requestUserLocation = () => {
     if (!('geolocation' in navigator)) {
@@ -562,7 +662,11 @@ export default function App() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
+        const loc = { lat: latitude, lng: longitude };
+        setUserLocation(loc);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('travel_assistant_user_location', JSON.stringify(loc));
+        }
         setCountryCode(getCountryCodeFromCoords(latitude, longitude));
         setLocationStatus(`📍 GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         setLocatingUser(false);
@@ -641,8 +745,12 @@ export default function App() {
 
   const toggleListening = async () => {
     if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
+      speechStopRequestedRef.current = true;
+      try {
+        recognitionRef.current?.stop();
+      } catch (e) {
+        console.warn('Error stopping recognition:', e);
+      }
       return;
     }
 
@@ -652,10 +760,13 @@ export default function App() {
       return;
     }
 
+    speechTranscriptRef.current = '';
+    speechStopRequestedRef.current = false;
+
     try {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
       recognition.lang = getRecognitionLanguage(sourceLanguage);
 
       recognition.onstart = () => {
@@ -663,25 +774,42 @@ export default function App() {
         setChatError('');
       };
       recognition.onresult = (event) => {
-        const transcript = event.results[0]?.[0]?.transcript;
-        if (transcript) {
-          updateChatInput(transcript);
-          translateMessage(transcript);
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          fullTranscript += event.results[i][0]?.transcript || '';
         }
-        setIsListening(false);
+        const trimmed = fullTranscript.trim();
+        if (trimmed) {
+          speechTranscriptRef.current = trimmed;
+          updateChatInput(trimmed);
+        }
       };
       recognition.onerror = (event) => {
         console.warn('Speech Recognition error event:', event.error);
         setIsListening(false);
         if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          setChatError('Izin mikrofon ditolak. Klik tombol 🔑 Permission di kanan atas atau izinkan mic pada address bar browser lalu coba lagi.');
+          setChatError('Izin mikrofon ditolak. Klik tombol 🛡️ Permission di kanan atas atau izinkan mic pada address bar browser lalu coba lagi.');
         } else if (event.error === 'no-speech') {
           setChatError('Tidak ada suara terdeteksi. Silakan coba bicara lagi.');
         } else if (event.error !== 'aborted') {
           setChatError(`Audio error (${event.error}). Coba lagi.`);
         }
       };
-      recognition.onend = () => setIsListening(false);
+      recognition.onend = () => {
+        setIsListening(false);
+        const finalText = speechTranscriptRef.current?.trim() || inputTextRef.current?.trim();
+        const wasStopRequested = speechStopRequestedRef.current;
+        speechStopRequestedRef.current = false;
+
+        if (finalText) {
+          updateChatInput(finalText);
+          if (wasStopRequested) {
+            translateMessage(finalText);
+          }
+        } else if (wasStopRequested) {
+          setChatError('Tidak ada suara terdeteksi. Silakan coba bicara lagi.');
+        }
+      };
 
       recognitionRef.current = recognition;
       recognition.start();
@@ -798,22 +926,15 @@ export default function App() {
             </div>
           </div>
           
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={requestAllPermissions}
-                    title="Minta Izin Akses Perangkat (Kamera, Mic, Lokasi)"
-                    className="px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 text-xs font-bold transition"
-                  >
-                    <span>🔑 Permission</span>
-                  </button>
-                  <button 
-                    onClick={handleLogout}
-                    title="Keluar / Logout"
-                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 flex items-center justify-center text-slate-600 transition"
-                  >
-                    <LogOut size={16} />
-                  </button>
-                </div>
+          <div className="flex items-center gap-1.5">
+            <button 
+              onClick={handleLogout}
+              title="Keluar / Logout"
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 flex items-center justify-center text-slate-600 transition"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </header>
 
         {/* Content Viewport */}
@@ -980,39 +1101,63 @@ export default function App() {
               </div>
 
               {/* Real Camera Viewfinder / Capture Box */}
-              <div className="bg-white border-2 border-dashed border-blue-400 rounded-2xl p-4 text-center shadow-xs overflow-hidden relative">
+              <div className={`bg-white border-2 border-dashed border-blue-400 rounded-2xl text-center shadow-xs overflow-hidden relative transition-all ${isCameraActive ? 'p-0 border-solid border-slate-900' : 'p-4'}`}>
                 {isCameraActive ? (
-                  <div className="space-y-3">
-                    <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-56 mx-auto">
-                      <video 
-                        ref={videoRef} 
-                        autoPlay 
-                        playsInline 
-                        muted 
-                        className="w-full h-full object-cover"
-                      />
-                      <button 
-                        onClick={toggleCameraFacing}
-                        className="absolute right-2 top-2 p-2 bg-black/60 text-white rounded-full hover:bg-black/80"
-                        title="Ganti Kamera Depan/Belakang"
-                      >
-                        <SwitchCamera size={16} />
-                      </button>
+                  <div className="relative w-full h-[400px] sm:h-[460px] bg-black overflow-hidden flex flex-col justify-between">
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      muted 
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    
+                    {/* Viewfinder Target Reticle Overlay */}
+                    <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
+                      <div className="w-56 h-56 border-2 border-white/60 rounded-2xl relative shadow-lg">
+                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
+                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
+                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                      </div>
+                      <span className="mt-4 px-3 py-1 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium rounded-full shadow-md">
+                        Arahkan kamera ke tag harga / produk
+                      </span>
                     </div>
 
-                    <div className="flex gap-2">
+                    {/* Top Control Overlay Bar */}
+                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-between text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                        <span className="text-xs font-bold tracking-wide">CAMERA LIVE</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={toggleCameraFacing}
+                          className="p-2.5 bg-black/50 hover:bg-black/80 backdrop-blur-xs text-white rounded-full transition"
+                          title="Ganti Kamera Depan/Belakang"
+                        >
+                          <SwitchCamera size={18} />
+                        </button>
+                        <button 
+                          onClick={stopCamera}
+                          className="px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-xs text-white text-xs font-bold rounded-full transition"
+                        >
+                          Tutup ✕
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Control Overlay Shutter Bar */}
+                    <div className="relative z-10 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-center">
                       <button 
                         onClick={capturePhoto}
-                        className="flex-1 py-3 bg-blue-600 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-2 hover:bg-blue-700"
+                        className="w-16 h-16 rounded-full border-4 border-white bg-blue-600 hover:bg-blue-500 flex items-center justify-center shadow-xl active:scale-95 transition transform"
+                        title="Ambil Foto Tag Harga"
                       >
-                        <Camera size={16} />
-                        <span>Ambil Foto Tag Harga</span>
-                      </button>
-                      <button 
-                        onClick={stopCamera}
-                        className="px-4 py-3 bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl hover:bg-slate-200"
-                      >
-                        Tutup
+                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-blue-600">
+                          <Camera size={22} />
+                        </div>
                       </button>
                     </div>
                   </div>
@@ -1056,7 +1201,14 @@ export default function App() {
 
               {/* Scanned Result Card */}
               {scannedResult && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
+                  <button
+                    onClick={() => { setScannedResult(null); setScannedResultSaved(false); }}
+                    className="absolute top-3 right-3 w-7 h-7 rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center text-xs font-bold transition z-10"
+                    title="Tutup / Hapus Hasil Scan"
+                  >
+                    ✕
+                  </button>
                   {scannedResult.image_url && (
                     <div className="w-full h-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center">
                       <img src={scannedResult.image_url} alt="Scanned" className="w-full h-full object-cover" />
@@ -1071,7 +1223,30 @@ export default function App() {
                     {scannedResult.confidence != null && <span className="text-xs text-slate-400">Confidence {scannedResult.confidence}</span>}
                   </div>
 
-                  <h2 className="text-base font-bold font-heading text-slate-900">{scannedResult.product_name}</h2>
+                  <h2 className="text-base font-bold font-heading text-slate-900 pr-8">{scannedResult.product_name}</h2>
+
+                  <div className="flex items-center gap-2">
+                    {scannedResult.location_name && (
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md font-medium">
+                        <MapPin size={12} className="text-emerald-600" />
+                        <span>{scannedResult.location_name}</span>
+                      </div>
+                    )}
+                    <a
+                      href={
+                        scannedResult.latitude && scannedResult.longitude
+                          ? `https://www.google.com/maps?q=${scannedResult.latitude},${scannedResult.longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(scannedResult.location_name || scannedResult.product_name)}`
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md font-semibold transition"
+                      title="Buka Lokasi Scan di Google Maps"
+                    >
+                      <MapPin size={12} className="text-blue-600" />
+                      <span>📍 Buka GPS di Maps ↗</span>
+                    </a>
+                  </div>
 
                   <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                     <div>
@@ -1110,6 +1285,32 @@ export default function App() {
                       )}
                     </div>
                   )}
+
+                  <button
+                    onClick={saveScannedResultToHistory}
+                    disabled={scannedResultSaved || scanSaving}
+                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-xs ${
+                      scannedResultSaved
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-default'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-98'
+                    }`}
+                  >
+                    {scanSaving ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Menyimpan ke Server...</span>
+                      </>
+                    ) : scannedResultSaved ? (
+                      <>
+                        <Check size={14} />
+                        <span>Tersimpan di Riwayat Database</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾 Simpan Hasil Scan ke Server & Database</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 
@@ -1123,13 +1324,29 @@ export default function App() {
                     </div>
                   ) : (
                     scanHistoryList.map((item, idx) => (
-                      <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs">
-                        <div className="min-w-0 pr-2">
+                      <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs gap-3">
+                        {item.image_url ? (
+                          <img 
+                            src={item.image_url} 
+                            alt={item.product_name} 
+                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200" 
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-xl font-bold border border-slate-200">
+                            📷
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 pr-1">
                           <div className="text-sm font-bold text-slate-900 truncate">{item.product_name}</div>
-                          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
                             <span>•</span>
                             <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
+                            {(item.location_name || item.locationName) && (
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">
+                                📍 {item.location_name || item.locationName}
+                              </span>
+                            )}
                             {item.latitude != null && item.longitude != null && (
                               <a
                                 href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
@@ -1138,16 +1355,27 @@ export default function App() {
                                 className="px-1.5 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-semibold text-[10px] flex items-center gap-0.5 transition"
                                 title="Buka Lokasi Scan di Google Maps"
                               >
-                                📍 Google Maps
+                                Maps ↗
                               </a>
                             )}
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-bold text-emerald-600">
-                            {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga tidak tersedia'}
+                        <div className="text-right shrink-0 flex items-center gap-2">
+                          <div>
+                            <div className="text-sm font-bold text-emerald-600">
+                              {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga tidak tersedia'}
+                            </div>
+                            <div className="text-[10px] text-slate-400">Estimasi Indo</div>
                           </div>
-                          <div className="text-[10px] text-slate-400">Indo Price</div>
+                          {item.id && (
+                            <button
+                              onClick={() => deleteScanHistoryItem(item.id)}
+                              className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg text-xs font-bold transition"
+                              title="Hapus riwayat scanner ini"
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))
@@ -1212,46 +1440,68 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Input Controls Bar */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="text" 
+                {/* Enhanced Text Input Controls Bar */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2.5 shadow-2xs">
+                  <div className="relative">
+                    <textarea 
+                      rows={3}
                       value={inputText}
                       onChange={(e) => updateChatInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           translateMessage();
                         }
                       }}
                       placeholder="Ketik kalimat atau tekan mic untuk bicara..."
-                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+                      className="w-full bg-white border border-slate-200 rounded-xl p-3 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition resize-none leading-relaxed shadow-2xs"
                     />
+                    {inputText && (
+                      <button
+                        onClick={() => updateChatInput('')}
+                        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition text-xs font-bold"
+                        title="Bersihkan teks input"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
 
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
                     <button 
                       onClick={toggleListening}
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs transition active:scale-95 ${
-                        isListening ? 'bg-red-500 animate-pulse ring-2 ring-red-300' : 'bg-slate-800 hover:bg-slate-900'
+                      className={`px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-white text-xs font-bold shrink-0 shadow-xs transition active:scale-95 ${
+                        isListening 
+                          ? 'bg-red-500 hover:bg-red-600 animate-pulse ring-2 ring-red-300' 
+                          : 'bg-slate-800 hover:bg-slate-900'
                       }`}
                       title="Tekan untuk Bicara (Web Speech API)"
                     >
-                      <Mic size={16} />
+                      <Mic size={15} />
+                      <span>{isListening ? 'Berhenti' : 'Bicara'}</span>
                     </button>
 
-                    <button 
-                      onClick={() => translateMessage()} 
-                      disabled={chatLoading} 
-                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 shadow-xs transition disabled:opacity-60"
-                    >
-                      {chatLoading ? 'Sync...' : 'Kirim'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="hidden sm:inline text-[10px] text-slate-400 font-medium">
+                        Enter untuk kirim
+                      </span>
+                      <button 
+                        onClick={() => translateMessage()} 
+                        disabled={chatLoading || !inputText.trim()} 
+                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-40 flex items-center gap-1.5"
+                        title="Kirim Pesan"
+                      >
+                        <span>{chatLoading ? 'Proses' : 'Kirim'}</span>
+                        <span className="text-xs">🚀</span>
+                      </button>
+                    </div>
                   </div>
 
                   {isListening && (
-                    <p className="text-[11px] text-red-500 font-medium text-center animate-pulse">
-                      🎙️ Mendengarkan suara... Bicara sekarang
-                    </p>
+                    <div className="p-2 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-600 font-semibold text-center animate-pulse flex items-center justify-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                      🎙️ Mendengarkan suara... Bicara sekarang, atau tekan Berhenti
+                    </div>
                   )}
                 </div>
                 {chatError && (
@@ -1275,100 +1525,164 @@ export default function App() {
                   </div>
                 )}
                 
-                {translatedText && (
-                  <div className="space-y-3 text-left pt-2 border-t border-slate-100 animate-in fade-in">
-                    {/* Chat Bubble Layout */}
-                    <div className="space-y-2">
-                      <div className={`flex ${getBubbleSide(sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs space-y-1 ${
-                          getBubbleSide(sourceLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-900'
-                        }`}>
-                          <div className={`text-[10px] font-bold uppercase ${getBubbleSide(sourceLanguage) === 'right' ? 'text-blue-100' : 'text-slate-500'}`}>
-                            {getLanguageLabel(sourceLanguage)}
-                          </div>
-                          <div className="font-medium">{inputText}</div>
-                        </div>
-                      </div>
-
-                      <div className={`flex ${getBubbleSide(targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs space-y-1 relative shadow-xs ${
-                          getBubbleSide(targetLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
-                        }`}>
-                          <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-1 mb-1">
-                            <span className="text-[10px] text-white/80 font-bold uppercase">{getLanguageLabel(targetLanguage)}</span>
-                            <button 
-                              onClick={() => playAudio(translatedText, targetLanguage, 'active-trans')}
-                              className="p-1 hover:bg-white/20 rounded-md transition text-white"
-                              title="Putar Audio Suara (ElevenLabs / TTS)"
-                            >
-                              <Volume2 size={14} className={playingAudioId === 'active-trans' ? 'animate-bounce text-yellow-300' : ''} />
-                            </button>
-                          </div>
-                          <div className="whitespace-pre-line leading-relaxed font-medium">
-                            {translatedText.split('\n').map((line, idx) => {
-                              if (line.includes('**')) {
-                                const parts = line.split(/(\*\*.*?\*\*)/g);
-                                return (
-                                  <div key={idx} className="text-sm font-bold tracking-wide">
-                                    {parts.map((p, pIdx) => p.startsWith('**') && p.endsWith('**') ? <strong key={pIdx} className="text-yellow-200">{p.slice(2, -2)}</strong> : p)}
-                                  </div>
-                                );
-                              }
-                              return <div key={idx} className={idx > 0 ? "text-xs italic text-blue-100 mt-0.5" : "text-sm"}>{line}</div>;
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button onClick={saveChat} disabled={chatSaving || !isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)} className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50">
-                        {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan'}
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setInputText('');
-                          setTranslatedText('');
-                          setTranslationSnapshot(null);
-                        }} 
-                        className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition"
+                {/* Fixed Height Scrollable Chat Box Container */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-3 max-h-80 overflow-y-auto text-left">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200 text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">💬 Obrolan ({chatMessages.length})</span>
+                    {chatMessages.length > 0 && (
+                      <button
+                        onClick={() => setChatMessages([])}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+                        title="Bersihkan percakapan di chat box"
                       >
-                        🗑️ Hapus
+                        🗑️ Bersihkan Chat
                       </button>
-                    </div>
+                    )}
+                  </div>
+
+                  {chatMessages.length === 0 ? (
+                    <p className="text-center text-xs text-slate-400 py-6">
+                      Belum ada pesan. Ketik kalimat atau tekan mic untuk mulai ngobrol.
+                    </p>
+                  ) : (
+                    chatMessages.map((msg, mIdx) => (
+                      <div key={msg.id || mIdx} className="space-y-1.5 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                        <div className={`flex ${getBubbleSide(msg.sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] rounded-xl px-3 py-1.5 text-xs ${
+                            getBubbleSide(msg.sourceLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-900'
+                          }`}>
+                            <div className="text-[9px] font-bold uppercase opacity-80">{getLanguageLabel(msg.sourceLanguage)}</div>
+                            <div className="font-medium">{msg.sourceText}</div>
+                          </div>
+                        </div>
+
+                        <div className={`flex ${getBubbleSide(msg.targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs relative ${
+                            getBubbleSide(msg.targetLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
+                          }`}>
+                            <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-0.5 mb-1">
+                              <span className="text-[9px] text-white/80 font-bold uppercase">{getLanguageLabel(msg.targetLanguage)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => saveChat(msg)}
+                                  className="p-0.5 hover:bg-white/20 rounded transition text-white text-[10px] flex items-center gap-0.5 font-semibold"
+                                  title="Simpan percakapan ini ke Database"
+                                >
+                                  💾 Simpan
+                                </button>
+                                <button 
+                                  onClick={() => playAudio(msg.translatedText, msg.targetLanguage, msg.id || mIdx)}
+                                  className="p-0.5 hover:bg-white/20 rounded transition text-white"
+                                  title="Putar Audio"
+                                >
+                                  <Volume2 size={13} className={playingAudioId === (msg.id || mIdx) ? 'animate-bounce text-yellow-300' : ''} />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="whitespace-pre-line leading-relaxed font-medium">
+                              {msg.translatedText.split('\n').map((line, idx) => {
+                                if (line.includes('**')) {
+                                  const parts = line.split(/(\*\*.*?\*\*)/g);
+                                  return (
+                                    <div key={idx} className="text-xs font-bold tracking-wide">
+                                      {parts.map((p, pIdx) => p.startsWith('**') && p.endsWith('**') ? <strong key={pIdx} className="text-yellow-200">{p.slice(2, -2)}</strong> : p)}
+                                    </div>
+                                  );
+                                }
+                                return <div key={idx} className={idx > 0 ? "text-[11px] italic text-blue-100 mt-0.5" : "text-xs"}>{line}</div>;
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {(chatMessages.length > 0 || translatedText) && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button 
+                      onClick={() => saveChat()} 
+                      disabled={chatSaving} 
+                      className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
+                    >
+                      {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan Terbaru ke DB'}
+                    </button>
                   </div>
                 )}
-
-                <div className="flex justify-center pt-2">
-                </div>
               </div>
 
               {/* History Percakapan */}
               <div className="space-y-2">
-                <h2 className="text-sm font-bold font-heading text-slate-900">Percakapan Tersimpan</h2>
+                <div className="flex justify-between items-center">
+                  <h2 className="text-sm font-bold font-heading text-slate-900">Percakapan Tersimpan ({chatHistory.length})</h2>
+                  {chatHistory.length > 5 && (
+                    <button
+                      onClick={() => setShowAllHistoryModal(true)}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-bold"
+                    >
+                      Lihat Semua →
+                    </button>
+                  )}
+                </div>
+
                 {chatHistoryLoading ? (
                   <p className="text-xs text-slate-500">Memuat riwayat percakapan...</p>
                 ) : chatHistory.length === 0 ? (
                   <p className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">Belum ada percakapan tersimpan.</p>
                 ) : (
-                  chatHistory.map((item) => (
-                    <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
-                      <div className="flex justify-between items-start text-[10px] text-slate-400">
-                        <span>{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
-                        <div className="flex items-center gap-2">
+                  <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 pt-1">
+                    {chatHistory.slice(0, 5).map((item) => (
+                      <div 
+                        key={item.id} 
+                        className="min-w-[220px] max-w-[240px] h-[130px] bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-blue-300 transition shrink-0 relative"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteChat(item.id);
+                          }}
+                          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10"
+                          title="Hapus percakapan tersimpan"
+                        >
+                          ✕
+                        </button>
+                        <div className="space-y-1 overflow-hidden cursor-pointer pl-5" onClick={() => loadItemToChat(item)}>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                            <span className="truncate">{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
+                          </div>
+                          <div className="text-xs font-semibold text-slate-800 line-clamp-1">{item.source_text}</div>
+                          <div className="text-xs text-blue-900 line-clamp-2 italic">{item.translated_text}</div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1">
+                          <button
+                            onClick={() => loadItemToChat(item)}
+                            className="text-[11px] text-blue-600 hover:text-blue-700 font-bold"
+                          >
+                            + Muat ke Chat
+                          </button>
                           <button 
                             onClick={() => playAudio(item.translated_text, item.target_language, item.id)}
-                            className="text-blue-600 hover:bg-blue-50 p-1 rounded flex items-center gap-1 font-semibold text-xs"
+                            className="text-blue-600 hover:bg-blue-50 p-1 rounded flex items-center gap-1 font-semibold text-xs shrink-0"
+                            title="Putar Audio"
                           >
-                            <Volume2 size={12} className={playingAudioId === item.id ? 'animate-bounce text-blue-600' : ''} /> Play
+                            <Volume2 size={13} className={playingAudioId === item.id ? 'animate-bounce text-blue-600' : ''} /> Play
                           </button>
-                          <button onClick={() => deleteChat(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded text-xs font-semibold">Hapus</button>
                         </div>
                       </div>
-                      <div className="bg-slate-50 p-2 rounded-lg text-xs text-slate-800">{item.source_text}</div>
-                      <div className="bg-blue-50 p-2 rounded-lg text-xs font-medium text-blue-950 whitespace-pre-line">{item.translated_text}</div>
-                    </div>
-                  ))
+                    ))}
+
+                    {chatHistory.length > 5 && (
+                      <button
+                        onClick={() => setShowAllHistoryModal(true)}
+                        className="min-w-[140px] h-[130px] bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center gap-1 shadow-2xs transition shrink-0 text-slate-600 font-bold text-xs"
+                      >
+                        <span>Lihat Semua</span>
+                        <span className="text-[10px] font-normal text-slate-400">({chatHistory.length - 5} lainnya)</span>
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1390,7 +1704,7 @@ export default function App() {
                 </div>
 
                 {/* Category Filter Chips */}
-                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2.5">
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2">
                   {['Semua', ...Array.from(new Set(phrasesList.map(p => p.category)))].map((cat) => (
                     <button
                       key={cat}
@@ -1406,8 +1720,20 @@ export default function App() {
                   ))}
                 </div>
 
+                {/* Search Filter Input */}
+                <input
+                  type="text"
+                  placeholder="🔍 Cari frasa cepat..."
+                  value={phraseSearchQuery}
+                  onChange={(e) => setPhraseSearchQuery(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 mb-2 transition"
+                />
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {phrasesList.filter(p => selectedPhraseCategory === 'Semua' || p.category === selectedPhraseCategory).map((phrase, idx) => {
+                  {phrasesList.filter(p => 
+                    (selectedPhraseCategory === 'Semua' || p.category === selectedPhraseCategory) &&
+                    (!phraseSearchQuery || p.text.toLowerCase().includes(phraseSearchQuery.toLowerCase()))
+                  ).map((phrase, idx) => {
                     const realIndex = phrasesList.findIndex(p => p === phrase);
                     return (
                       <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-blue-300 transition">
@@ -1651,6 +1977,67 @@ export default function App() {
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
                       >
                         Tambah & Cari
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {/* Modal All Saved History */}
+              {showAllHistoryModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col shadow-xl animate-in zoom-in-95">
+                    <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900">Semua Percakapan Tersimpan</h3>
+                        <p className="text-xs text-slate-500">Klik kartu untuk memuat pesan ke chat box</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowAllHistoryModal(false)}
+                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 font-bold text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+                      {chatHistory.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-blue-300 transition space-y-2 relative"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteChat(item.id);
+                            }}
+                            className="absolute top-2.5 left-2.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10"
+                            title="Hapus percakapan tersimpan"
+                          >
+                            ✕
+                          </button>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium pl-6">
+                            <span>{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
+                            <button 
+                              onClick={() => playAudio(item.translated_text, item.target_language, `modal-${item.id}`)}
+                              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 font-semibold text-xs"
+                            >
+                              <Volume2 size={13} className={playingAudioId === `modal-${item.id}` ? 'animate-bounce text-blue-600' : ''} /> Play
+                            </button>
+                          </div>
+                          <div className="cursor-pointer space-y-1" onClick={() => { loadItemToChat(item); setShowAllHistoryModal(false); }}>
+                            <div className="text-xs font-semibold text-slate-800 line-clamp-2">{item.source_text}</div>
+                            <div className="text-xs text-blue-950 font-medium whitespace-pre-line bg-slate-50 p-2 rounded-lg">{item.translated_text}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                      <button
+                        onClick={() => setShowAllHistoryModal(false)}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
+                      >
+                        Tutup
                       </button>
                     </div>
                   </div>
