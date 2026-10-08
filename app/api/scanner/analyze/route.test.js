@@ -100,6 +100,7 @@ test('analyzes and saves normalized fields as an estimate', async () => {
     analysis.lowest_price_idr, analysis.average_price_idr, analysis.currency,
     analysis.marketplace, analysis.marketplace_url, analysis.tokopedia_url,
     analysis.shopee_url, analysis.confidence, analysis.estimate_note, true,
+    null, null, null
   ]);
   assert.deepEqual(await response.json(), { success: true, item: saved });
 });

@@ -7,7 +7,7 @@ export function createHistoryHandler({ authenticate = verifyToken, query: runQue
     try {
       const auth = authenticate(request);
       if (!auth || auth.role !== 'owner') return NextResponse.json({ error: 'Autentikasi diperlukan' }, { status: 401 });
-      const result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, created_at FROM scan_history ORDER BY created_at DESC LIMIT 10`);
+      const result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, created_at FROM scan_history ORDER BY created_at DESC LIMIT 10`);
       return NextResponse.json({ history: result.rows });
     } catch {
       return NextResponse.json({ error: 'Gagal memuat riwayat scan' }, { status: 500 });

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowUpDown, 
+  ArrowRightLeft,
+  Coins,
   Camera, 
   MessageSquare, 
   MapPin, 
@@ -23,10 +25,10 @@ import {
   Pencil,
   Trash2
 } from 'lucide-react';
-import { CURRENCIES, convert, formatAmount, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
+import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
 import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots } from './spots.js';
-import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, toggleRecognition } from './chat.js';
+import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
 export default function App() {
@@ -44,6 +46,7 @@ export default function App() {
   const [ratesData, setRatesData] = useState({ IDR: 0, ...Object.fromEntries(CURRENCIES.map(currency => [currency, currency === 'JPY' ? 1 : 0])) });
   const [ratesLoading, setRatesLoading] = useState(false);
   const [lastRateUpdate, setLastRateUpdate] = useState('');
+  const [rateSource, setRateSource] = useState('bca');
   const [sourceAmount, setSourceAmount] = useState(0);
   const [idrAmount, setIdrAmount] = useState(0);
   const [activeChip, setActiveChip] = useState('JPY');
@@ -71,7 +74,7 @@ export default function App() {
   const [scanError, setScanError] = useState('');
 
   // Ngobrol State
-  const [selectedPhraseCategory, setSelectedPhraseCategory] = useState('resto');
+  const [selectedPhraseCategory, setSelectedPhraseCategory] = useState('Semua');
   const translationRequestIdRef = useRef(0);
   const recognitionRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
@@ -149,6 +152,7 @@ export default function App() {
       const res = await axios.get('/api/valas/rates');
       if (res.data && res.data.rates) {
         setRatesData(res.data.rates);
+        setRateSource(res.data.source || 'bca');
         setLastRateUpdate(new Date(res.data.lastUpdated).toLocaleTimeString('id-ID'));
         recalculate(sourceAmount, activeChip, res.data.rates);
       }
@@ -263,24 +267,29 @@ export default function App() {
     if (activeTab === 'ngobrol') loadChatHistory();
   }, [activeTab]);
 
-  const startCamera = async () => {
+  const startCamera = async (mode = facingMode) => {
     stopCamera();
     setScanError('');
     try {
       await cameraControllerRef.current.start({
         getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
         video: videoRef.current,
-        facingMode,
+        facingMode: { ideal: mode },
         ...cameraState(),
       });
       await videoRef.current?.play();
     } catch (err) {
       console.error('Kamera error:', err);
+      // Fallback ke kamera depan jika kamera belakang ideal gagal
+      if (mode === 'environment') {
+        setFacingMode('user');
+        return startCamera('user');
+      }
       const message = err?.name === 'NotAllowedError'
-        ? 'Izin kamera ditolak. Izinkan kamera di pengaturan browser lalu coba lagi.'
+        ? 'Izin kamera ditolak. Izinkan akses kamera di browser (klik icon gembok di address bar) lalu coba lagi.'
         : err?.name === 'NotFoundError'
-          ? 'Kamera tidak ditemukan. Hubungkan kamera atau pilih perangkat lain.'
-          : 'Kamera gagal dibuka. Periksa izin dan perangkat kamera lalu coba lagi.';
+          ? 'Kamera tidak ditemukan. Hubungkan webcam atau perangkat kamera.'
+          : 'Kamera gagal dibuka. Pastikan izin kamera aktif & tidak dipakai aplikasi lain.';
       setScanError(message);
       stopCamera();
     }
@@ -322,9 +331,59 @@ export default function App() {
   const processScan = async (imageDataUrl) => {
     setScanLoading(true);
     setScanError('');
+
+    // Fetch GPS location at scan/upload time if available
+    let photoLat = userLocation?.lat || null;
+    let photoLng = userLocation?.lng || null;
+    let photoLocName = null;
+
+    if (!photoLat && typeof window !== 'undefined' && 'geolocation' in navigator) {
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 60000 });
+        });
+        photoLat = pos.coords.latitude;
+        photoLng = pos.coords.longitude;
+        setUserLocation({ lat: photoLat, lng: photoLng });
+      } catch {
+        // Continue scan without location if denied/timeout
+      }
+    }
+
+    if (photoLat && photoLng) {
+      photoLocName = `GPS (${photoLat.toFixed(4)}, ${photoLng.toFixed(4)})`;
+    }
+
     try {
-      const res = await axios.post('/api/scanner/analyze', { image_data_url: imageDataUrl }, { headers: { Authorization: `Bearer ${token}` } });
-      setScannedResult({ ...res.data.item, image_url: imageDataUrl });
+      const res = await axios.post('/api/scanner/analyze', { 
+        image_data_url: imageDataUrl,
+        latitude: photoLat,
+        longitude: photoLng,
+        location_name: photoLocName
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      const item = res.data.item;
+      setScannedResult({ ...item, image_url: imageDataUrl, latitude: photoLat, longitude: photoLng, location_name: photoLocName });
+
+      // Auto save scan result to history if token is present
+      if (token && item && item.product_name) {
+        try {
+          await axios.post('/api/scanner/history', {
+            product_name: item.product_name,
+            price_jpy: item.price_jpy || 0,
+            lowest_price_idr: item.lowest_price_idr || 0,
+            average_price_idr: item.average_price_idr || 0,
+            tokopedia_url: item.tokopedia_url || null,
+            shopee_url: item.shopee_url || null,
+            image_url: imageDataUrl,
+            latitude: photoLat,
+            longitude: photoLng,
+            location_name: photoLocName
+          }, { headers: { Authorization: `Bearer ${token}` } });
+        } catch (saveErr) {
+          console.warn('Auto save scan history warning:', saveErr);
+        }
+      }
+
       await loadScanHistory();
     } catch (err) {
       setScanError(err.response?.data?.error || 'Analisis gagal. Coba foto lebih jelas atau unggah gambar lain.');
@@ -471,31 +530,83 @@ export default function App() {
     if (userLocation) loadSpots(userLocation.lat, userLocation.lng, cat);
   };
 
-  // 5. Speech Audio & Speech Recognition
-  const playAudio = (text, lang = 'ja-JP') => {
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+
+  // 5. Speech Audio (ElevenLabs + SpeechSynthesis Fallback) & Speech Recognition
+  const playAudio = async (text, lang = 'ja-JP', id = null) => {
+    if (!text) return;
+    if (id) setPlayingAudioId(id);
+    try {
+      const res = await axios.post('/api/chat/tts', { text, language: lang }, { responseType: 'blob' });
+      if (res.status === 200 && res.data && res.data.type?.includes('audio')) {
+        const audioUrl = URL.createObjectURL(res.data);
+        const audio = new Audio(audioUrl);
+        audio.onended = () => setPlayingAudioId(null);
+        audio.onerror = () => fallbackWebSpeech(text, lang);
+        await audio.play();
+        return;
+      }
+    } catch (err) {
+      console.warn('ElevenLabs TTS fallback to SpeechSynthesis:', err);
+    }
+    fallbackWebSpeech(text, lang);
+  };
+
+  const fallbackWebSpeech = (text, lang) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
+      const cleanText = text.replace(/\*\*/g, '').replace(/\(.*?\)/g, '').trim();
+      const utterance = new SpeechSynthesisUtterance(cleanText);
       utterance.lang = lang;
       utterance.rate = 0.9;
+      utterance.onend = () => setPlayingAudioId(null);
+      utterance.onerror = () => setPlayingAudioId(null);
       window.speechSynthesis.speak(utterance);
+    } else {
+      setPlayingAudioId(null);
     }
   };
 
   const toggleListening = () => {
-    if (!recognitionRef.current) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        alert('Browser ini belum mendukung Web Speech Recognition. Silakan ketik langsung!');
-        return;
-      }
-      const recognition = new SpeechRecognition();
-      recognition.interimResults = false;
-      recognition.onresult = (event) => updateChatInput(event.results[0][0].transcript);
-      recognitionRef.current = recognition;
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
     }
-    recognitionRef.current.lang = getRecognitionLanguage(sourceLanguage);
-    toggleRecognition({ recognition: recognitionRef.current, isListening, setListening: setIsListening });
+
+    const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+    if (!SpeechRecognition) {
+      alert('💡 Browser ini (Safari/iOS) belum mendukung API Web Speech Recognition secara langsung.\n\nTips: Anda dapat menggunakan tombol Dikte (ikon Mic 🎤 pada keyboard perangkat) saat mengetik!');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = getRecognitionLanguage(sourceLanguage);
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        updateChatInput(transcript);
+        setIsListening(false);
+      };
+      recognition.onerror = (event) => {
+        console.warn('Speech Error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          alert('Izin mikrofon ditolak. Izinkan akses mic di address bar browser lalu coba lagi.');
+        }
+      };
+      recognition.onend = () => setIsListening(false);
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error(err);
+      setIsListening(false);
+    }
   };
 
   const phrases = {
@@ -600,15 +711,22 @@ export default function App() {
             </p>
           </div>
           
-          <div className="flex items-center gap-1.5">
-            <button 
-              onClick={handleLogout}
-              title="Keluar / Logout"
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 flex items-center justify-center text-slate-600 transition"
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={requestAllPermissions}
+                    title="Minta Izin Akses Perangkat (Kamera, Mic, Lokasi)"
+                    className="px-2.5 py-1.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 text-xs font-bold transition"
+                  >
+                    <span>🔑 Permission</span>
+                  </button>
+                  <button 
+                    onClick={handleLogout}
+                    title="Keluar / Logout"
+                    className="w-9 h-9 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 flex items-center justify-center text-slate-600 transition"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
         </header>
 
         {/* Content Viewport */}
@@ -623,7 +741,7 @@ export default function App() {
                 <div>
                   <h1 className="text-xl font-bold font-heading text-slate-900">Valas & Kurs Live</h1>
                   <p className="text-xs text-slate-500">
-                    1 {activeChip} = Rp {formatAmount(ratesData.IDR / (ratesData[activeChip] || 1))} • Update {lastRateUpdate || 'Realtime'}
+                    1 {activeChip} = {formatChipRate(ratesData, activeChip)} • {rateSource === 'bca' ? 'BCA e-Rate' : 'Live Rate'}
                   </p>
                 </div>
                 <button 
@@ -638,42 +756,36 @@ export default function App() {
 
               {/* Converter Interactive Box */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm relative space-y-3">
-                {/* JPY Input Box */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5">
-                  <div className="flex justify-between items-center text-xs font-semibold text-slate-500 mb-1">
-                    <span>KAMU BAYAR ({activeChip})</span>
-                    <span className="text-blue-600 font-bold flex items-center gap-1">{activeChip}</span>
+                {/* Valas Input Box */}
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xl leading-none">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
+                    <span className="text-lg font-bold text-slate-800 font-heading">{activeChip}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-extrabold text-slate-900 font-heading">{activeChip}</span>
-                    <input 
-                      type="text"
-                      inputMode="decimal"
-                      value={displayedAmount(sourceAmount)}
-                      onChange={(e) => handleSourceChange(e.target.value)}
-                      placeholder="0"
-                      className="w-full text-right text-2xl font-extrabold text-slate-900 font-heading bg-transparent outline-none pr-1"
-                    />
-                  </div>
+                  <input 
+                    type="text"
+                    inputMode="decimal"
+                    value={displayedAmount(sourceAmount)}
+                    onChange={(e) => handleSourceChange(e.target.value)}
+                    placeholder="0"
+                    className="w-full text-right text-2xl font-extrabold text-slate-900 font-heading bg-transparent outline-none"
+                  />
                 </div>
 
-              {/* IDR Result Box */}
-                <div className="bg-blue-50/70 border border-blue-100 rounded-xl p-3.5">
-                  <div className="flex justify-between items-center text-xs font-semibold text-blue-600 mb-1">
-                    <span>SETARA RUPIAH (IDR)</span>
-                    <span className="text-blue-700 font-bold">🇮🇩 IDR</span>
+                {/* IDR Result Box */}
+                <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xl leading-none">🇮🇩</span>
+                    <span className="text-lg font-bold text-blue-900 font-heading">IDR</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-extrabold text-blue-700 font-heading">Rp</span>
-                    <input 
-                      type="text"
-                      inputMode="decimal"
-                      value={displayedAmount(idrAmount)}
-                      onChange={(e) => handleIdrChange(e.target.value)}
-                      placeholder="0"
-                      className="w-full text-right text-2xl font-extrabold text-blue-700 font-heading bg-transparent outline-none pr-1"
-                    />
-                  </div>
+                  <input 
+                    type="text"
+                    inputMode="decimal"
+                    value={displayedAmount(idrAmount)}
+                    onChange={(e) => handleIdrChange(e.target.value)}
+                    placeholder="0"
+                    className="w-full text-right text-2xl font-extrabold text-blue-900 font-heading bg-transparent outline-none"
+                  />
                 </div>
 
                 <input
@@ -681,7 +793,7 @@ export default function App() {
                   value={conversionNote}
                   onChange={(e) => setConversionNote(e.target.value)}
                   placeholder="Catatan (opsional)"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-base sm:text-xs"
                 />
                 {conversionError && <p role="alert" className="text-xs text-red-600">{conversionError}</p>}
                 {!isConversionRateAvailable(ratesData.IDR, ratesData[activeChip]) && sourceAmount > 0 && <p role="alert" className="text-xs text-red-600">Kurs belum tersedia. Muat ulang kurs sebelum menyimpan konversi.</p>}
@@ -695,21 +807,32 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Preset Currency Chips */}
-              <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
-                {CURRENCIES.map(curr => (
-                  <button 
-                    key={curr}
-                    onClick={() => { setActiveChip(curr); recalculate(sourceAmount, curr); }}
-                    className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap transition ${
-                      activeChip === curr 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    {curr} {curr !== 'JPY' ? `(${Number(ratesData[curr] || 0).toFixed(4)})` : ''}
-                  </button>
-                ))}
+              {/* Preset Currency Chips (Horizontal Swipe - Perfectly Aligned) */}
+              <div className="py-1">
+                <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory py-1 px-0 no-scrollbar">
+                  {CURRENCIES.map(curr => {
+                    const rateText = formatChipRate(ratesData, curr);
+                    return (
+                      <button 
+                        key={curr}
+                        onClick={() => { setActiveChip(curr); recalculate(sourceAmount, curr); }}
+                        className={`min-w-[105px] shrink-0 snap-start p-2.5 text-left rounded-xl transition border flex flex-col justify-between min-h-[54px] ${
+                          activeChip === curr 
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-600/20' 
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-xs font-extrabold flex items-center justify-between w-full">
+                          <span>{curr}</span>
+                          <span className="text-sm leading-none">{CURRENCY_FLAGS[curr] || '🏳️'}</span>
+                        </span>
+                        <span className={`text-[11px] font-semibold tracking-tight ${activeChip === curr ? 'text-blue-100' : 'text-slate-500'}`}>
+                          {rateText || '...'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Recent Conversions from Supabase */}
@@ -724,7 +847,7 @@ export default function App() {
                     conversionHistory.map((item, idx) => (
                       editingConversion?.id === item.id ? (
                         <div key={item.id || idx} className="bg-white border border-blue-200 rounded-xl p-3 space-y-2">
-                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" />
+                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-base sm:text-xs" />
                           <div className="flex gap-2">
                             <button onClick={() => updateConversion(editingConversion)} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Simpan</button>
                             <button onClick={() => setEditingConversion(null)} className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">Batal</button>
@@ -865,15 +988,15 @@ export default function App() {
 
                   <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
                     <div>
-                      <div className="text-[11px] font-semibold text-slate-500">HARGA JEPANG · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-slate-900 mt-0.5">
-                        {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
-                      </div>
-                    </div>
-                    <div>
                       <div className="text-[11px] font-semibold text-slate-500">TERENDAH INDONESIA · ESTIMASI AI</div>
                       <div className="text-sm font-extrabold text-emerald-600 mt-0.5">
                         {scannedResult.lowest_price_idr != null ? `Rp ${Number(scannedResult.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold text-slate-500">HARGA JEPANG · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                        {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
                       </div>
                     </div>
                     <div className="col-span-2 pt-2 border-t border-slate-200">
@@ -914,11 +1037,26 @@ export default function App() {
                   ) : (
                     scanHistoryList.map((item, idx) => (
                       <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs">
-                        <div>
-                          <div className="text-sm font-bold text-slate-900">{item.product_name}</div>
-                          <div className="text-xs text-slate-400">{new Date(item.created_at).toLocaleDateString('id-ID')} • ¥{Number(item.price_jpy).toLocaleString('id-ID')}</div>
+                        <div className="min-w-0 pr-2">
+                          <div className="text-sm font-bold text-slate-900 truncate">{item.product_name}</div>
+                          <div className="text-xs text-slate-400 flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
+                            <span>•</span>
+                            <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
+                            {item.latitude != null && item.longitude != null && (
+                              <a
+                                href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-1.5 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-semibold text-[10px] flex items-center gap-0.5 transition"
+                                title="Buka Lokasi Scan di Google Maps"
+                              >
+                                📍 Google Maps
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0">
                           <div className="text-sm font-bold text-emerald-600">
                             {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga tidak tersedia'}
                           </div>
@@ -947,15 +1085,43 @@ export default function App() {
 
               {/* Voice Card Input */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center relative space-y-3">
-                <div className="flex justify-between items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-blue-600">
-                  <select aria-label="Bahasa sumber" value={sourceLanguage} onChange={updateChatLanguage(setSourceLanguage)} className="bg-transparent outline-none">
-                    <option value="id">🇮🇩 Indonesia</option>
-                    <option value="ja">🇯🇵 Japanese</option>
+                <div className="flex justify-between items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-blue-600 gap-2">
+                  <select 
+                    aria-label="Bahasa sumber" 
+                    value={sourceLanguage} 
+                    onChange={updateChatLanguage(setSourceLanguage)} 
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
+                  >
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <option key={`src-${lang.code}`} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
                   </select>
-                  <ArrowUpDown size={14} className="text-slate-400 rotate-90" />
-                  <select aria-label="Bahasa target" value={targetLanguage} onChange={updateChatLanguage(setTargetLanguage)} className="bg-transparent outline-none">
-                    <option value="ja">🇯🇵 Japanese</option>
-                    <option value="id">🇮🇩 Indonesia</option>
+                  
+                  <button 
+                    onClick={() => {
+                      const temp = sourceLanguage;
+                      setSourceLanguage(targetLanguage);
+                      setTargetLanguage(temp);
+                    }}
+                    className="p-1 hover:bg-slate-200 rounded-md transition text-slate-500"
+                    title="Tukar Bahasa"
+                  >
+                    <ArrowRightLeft size={14} />
+                  </button>
+
+                  <select 
+                    aria-label="Bahasa target" 
+                    value={targetLanguage} 
+                    onChange={updateChatLanguage(setTargetLanguage)} 
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
+                  >
+                    {SUPPORTED_LANGUAGES.map((lang) => (
+                      <option key={`tgt-${lang.code}`} value={lang.code}>
+                        {lang.flag} {lang.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -964,77 +1130,141 @@ export default function App() {
                   value={inputText}
                   onChange={(e) => updateChatInput(e.target.value)}
                   placeholder="Ketik kalimat atau tekan mic untuk bicara..."
-                  className="w-full text-center text-sm p-2 outline-none text-slate-800 placeholder-slate-400"
+                  className="w-full text-center text-base sm:text-sm p-2 outline-none text-slate-800 placeholder-slate-400 border-b border-slate-100"
                 />
 
-                <button onClick={translateMessage} disabled={chatLoading} className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold disabled:opacity-60">
-                  {chatLoading ? 'Menerjemahkan...' : `Terjemahkan ke ${getLanguageLabel(targetLanguage)}`}
+                <button onClick={translateMessage} disabled={chatLoading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition disabled:opacity-60">
+                  {chatLoading ? 'Menerjemahkan...' : `Terjemahkan (${getLanguageLabel(sourceLanguage)} → ${getLanguageLabel(targetLanguage)})`}
                 </button>
-                {chatError && <p role="alert" className="text-xs text-red-600">{chatError}</p>}
+                {chatError && <p role="alert" className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{chatError}</p>}
+                
                 {translatedText && (
-                  <div className="space-y-2 text-left">
-                    <div className={`flex ${getBubbleSide(sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}><div className="max-w-[85%] bg-slate-100 rounded-xl px-3 py-2 text-sm text-slate-800">{inputText}</div></div>
-                    <div className={`flex ${getBubbleSide(targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}><div className="max-w-[85%] bg-blue-600 rounded-xl px-3 py-2 text-sm text-white">{translatedText}</div></div>
-                    <button onClick={saveChat} disabled={chatSaving || !isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)} className="w-full py-2 border border-slate-300 rounded-xl text-xs font-bold disabled:opacity-60">{chatSaving ? 'Menyimpan...' : 'Simpan percakapan'}</button>
+                  <div className="space-y-3 text-left pt-2 border-t border-slate-100 animate-in fade-in">
+                    <div className="flex justify-start">
+                      <div className="max-w-[90%] bg-slate-100 rounded-2xl px-3.5 py-2.5 text-xs text-slate-800 space-y-1">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">{getLanguageLabel(sourceLanguage)}</div>
+                        <div>{inputText}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <div className="max-w-[90%] bg-blue-600 text-white rounded-2xl px-3.5 py-2.5 text-xs space-y-1 shadow-xs relative">
+                        <div className="flex items-center justify-between gap-2 border-b border-blue-500/50 pb-1 mb-1">
+                          <span className="text-[10px] text-blue-200 font-bold uppercase">{getLanguageLabel(targetLanguage)}</span>
+                          <button 
+                            onClick={() => playAudio(translatedText, targetLanguage, 'active-trans')}
+                            className="p-1 hover:bg-blue-500 rounded-md transition text-white"
+                            title="Putar Audio Suara (ElevenLabs / TTS)"
+                          >
+                            <Volume2 size={14} className={playingAudioId === 'active-trans' ? 'animate-bounce text-yellow-300' : ''} />
+                          </button>
+                        </div>
+                        <div className="whitespace-pre-line leading-relaxed font-medium">
+                          {translatedText.split('\n').map((line, idx) => {
+                            if (line.includes('**')) {
+                              const parts = line.split(/(\*\*.*?\*\*)/g);
+                              return (
+                                <div key={idx} className="text-sm font-bold tracking-wide">
+                                  {parts.map((p, pIdx) => p.startsWith('**') && p.endsWith('**') ? <strong key={pIdx} className="text-yellow-200">{p.slice(2, -2)}</strong> : p)}
+                                </div>
+                              );
+                            }
+                            return <div key={idx} className={idx > 0 ? "text-xs italic text-blue-100 mt-0.5" : "text-sm"}>{line}</div>;
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={saveChat} disabled={chatSaving || !isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)} className="w-full py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50">
+                      {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan'}
+                    </button>
                   </div>
                 )}
 
-                <div className="flex justify-center pt-1">
+                <div className="flex justify-center pt-2">
                   <button 
                     onClick={toggleListening}
                     className={`w-14 h-14 rounded-full flex items-center justify-center text-xl text-white shadow-lg transition active:scale-95 ${
-                      isListening ? 'bg-red-500 animate-pulse' : 'bg-blue-600 hover:bg-blue-700'
+                      isListening ? 'bg-red-500 animate-pulse ring-4 ring-red-200' : 'bg-blue-600 hover:bg-blue-700'
                     }`}
+                    title="Tekan untuk Bicara (Web Speech API)"
                   >
                     <Mic size={24} />
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  {isListening ? 'Mendengarkan suara...' : 'Tekan tombol mic untuk mulai rekam'}
+                  {isListening ? '🎙️ Mendengarkan suara Anda...' : 'Tekan tombol mic untuk mulai rekam'}
                 </p>
               </div>
 
+              {/* History Percakapan */}
               <div className="space-y-2">
-                <h2 className="text-sm font-bold font-heading text-slate-900">Percakapan tersimpan</h2>
-                {chatHistoryLoading ? <p className="text-xs text-slate-500">Memuat riwayat percakapan...</p> : chatHistory.length === 0 ? <p className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-500">Belum ada percakapan tersimpan.</p> : chatHistory.map((item) => (
-                  <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
-                    <div className={`flex ${getBubbleSide(item.source_language) === 'right' ? 'justify-end' : 'justify-start'}`}><p className="max-w-[85%] bg-slate-100 rounded-lg px-2.5 py-1.5 text-xs">{item.source_text}</p></div>
-                    <div className={`flex ${getBubbleSide(item.target_language) === 'right' ? 'justify-end' : 'justify-start'}`}><p className="max-w-[85%] bg-blue-600 text-white rounded-lg px-2.5 py-1.5 text-xs">{item.translated_text}</p></div>
-                    <button onClick={() => deleteChat(item.id)} className="text-xs text-red-600 font-semibold">Hapus</button>
-                  </div>
-                ))}
+                <h2 className="text-sm font-bold font-heading text-slate-900">Percakapan Tersimpan</h2>
+                {chatHistoryLoading ? (
+                  <p className="text-xs text-slate-500">Memuat riwayat percakapan...</p>
+                ) : chatHistory.length === 0 ? (
+                  <p className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">Belum ada percakapan tersimpan.</p>
+                ) : (
+                  chatHistory.map((item) => (
+                    <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
+                      <div className="flex justify-between items-start text-[10px] text-slate-400">
+                        <span>{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => playAudio(item.translated_text, item.target_language, item.id)}
+                            className="text-blue-600 hover:bg-blue-50 p-1 rounded flex items-center gap-1 font-semibold text-xs"
+                          >
+                            <Volume2 size={12} className={playingAudioId === item.id ? 'animate-bounce text-blue-600' : ''} /> Play
+                          </button>
+                          <button onClick={() => deleteChat(item.id)} className="text-red-500 hover:bg-red-50 p-1 rounded text-xs font-semibold">Hapus</button>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 p-2 rounded-lg text-xs text-slate-800">{item.source_text}</div>
+                      <div className="bg-blue-50 p-2 rounded-lg text-xs font-medium text-blue-950 whitespace-pre-line">{item.translated_text}</div>
+                    </div>
+                  ))
+                )}
               </div>
+
+              {/* Quick Phrases */}
               <div>
-                <h2 className="text-sm font-bold font-heading text-slate-900 mb-2">Frasa Cepat Praktis</h2>
-                <div className="flex gap-1.5 mb-3">
-                  {['resto', 'toko', 'kereta'].map(cat => (
-                    <button 
+                <div className="flex justify-between items-center mb-2">
+                  <h2 className="text-sm font-bold font-heading text-slate-900">Frasa Cepat Praktis</h2>
+                  <span className="text-xs text-slate-400 font-medium">Filter Kategori</span>
+                </div>
+
+                {/* Category Filter Chips */}
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2.5">
+                  {['Semua', ...Array.from(new Set(QUICK_PHRASES.map(p => p.category)))].map((cat) => (
+                    <button
                       key={cat}
                       onClick={() => setSelectedPhraseCategory(cat)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg capitalize transition ${
-                        selectedPhraseCategory === cat 
-                          ? 'bg-blue-600 text-white shadow-2xs' 
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                        selectedPhraseCategory === cat
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
                       }`}
                     >
-                      {cat === 'resto' ? '🍔 Resto' : cat === 'toko' ? '🛍️ Belanja' : '🚆 Kereta'}
+                      {cat}
                     </button>
                   ))}
                 </div>
 
-                <div className="space-y-2">
-                  {phrases[selectedPhraseCategory].map((p, idx) => (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center shadow-2xs">
-                      <div>
-                        <div className="text-xs text-slate-400 font-medium">{p.idn}</div>
-                        <div className="text-sm font-bold text-slate-900 mt-0.5">{p.romaji}</div>
-                        <div className="text-xs font-medium text-blue-600">{p.kanji}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {QUICK_PHRASES.filter(p => selectedPhraseCategory === 'Semua' || p.category === selectedPhraseCategory).map((phrase, idx) => (
+                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center shadow-2xs hover:border-blue-300 transition">
+                      <div className="space-y-0.5 min-w-0 pr-2">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{phrase.category}</span>
+                        <div className="text-xs font-medium text-slate-800 line-clamp-2 mt-1">{phrase.text}</div>
                       </div>
                       <button 
-                        onClick={() => playAudio(p.kanji)}
-                        className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-base hover:bg-blue-100 transition active:scale-95"
+                        onClick={() => {
+                          setInputText(phrase.text);
+                          translateMessage();
+                        }}
+                        className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold shrink-0 transition"
                       >
-                        <Volume2 size={18} />
+                        Terjemahkan
                       </button>
                     </div>
                   ))}
@@ -1079,6 +1309,19 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              {/* GPS Coordinates & Status Badge */}
+              {userLocation && (
+                <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-3 flex items-center justify-between text-xs text-blue-900 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="font-bold">GPS Terdeteksi:</span>
+                  </div>
+                  <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-[11px] font-semibold text-blue-700 shadow-2xs">
+                    {userLocation.lat.toFixed(5)}, {userLocation.lng.toFixed(5)}
+                  </span>
+                </div>
+              )}
 
               {/* Spot Cards */}
               <div className="space-y-3">
@@ -1133,7 +1376,7 @@ export default function App() {
               activeTab === 'valas' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
-            <span className="text-lg">💱</span>
+            <ArrowRightLeft size={20} />
             <span className="text-[11px]">Valas</span>
           </button>
           

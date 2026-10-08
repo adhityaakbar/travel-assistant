@@ -13,10 +13,16 @@ function error(message, status) {
   return NextResponse.json({ error: message }, { status });
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function parseId(id) {
-  if (typeof id !== 'string' || !/^[1-9]\d*$/.test(id)) return null;
-  const value = Number(id);
-  return Number.isSafeInteger(value) ? value : null;
+  if (typeof id !== 'string') return null;
+  if (UUID_REGEX.test(id)) return id;
+  if (/^[1-9]\d*$/.test(id)) {
+    const value = Number(id);
+    return Number.isSafeInteger(value) ? value : null;
+  }
+  return null;
 }
 
 function validatePayload(payload) {

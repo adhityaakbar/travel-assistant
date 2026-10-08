@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { CURRENCIES, convert, formatAmount, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
+import { CURRENCIES, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 
 test('conversion starts at zero and uses selected currency rate', () => {
   assert.equal(convert(0, 0.0067), 0);
@@ -44,4 +44,11 @@ test('conversion rate must be finite and positive before saving', () => {
 
 test('empty note remains empty for persistence', () => {
   assert.equal(''.trim(), '');
+});
+
+test('formatChipRate formats rates into IDR exchange per unit', () => {
+  const mockRates = { IDR: 112.5, JPY: 1, USD: 0.0063, SGD: 0.008 };
+  assert.equal(formatChipRate(mockRates, 'JPY'), 'Rp 112.5');
+  assert.equal(formatChipRate(mockRates, 'USD'), 'Rp 17,857');
+  assert.equal(formatChipRate(null, 'JPY'), '');
 });

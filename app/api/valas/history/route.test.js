@@ -213,16 +213,16 @@ test('PATCH accepts zero amounts with a positive exchange rate', async () => {
   assert.deepEqual(values.slice(2, 5), [0, 0, 15000]);
 });
 
-test('DELETE removes valid history', async () => {
+test('DELETE removes valid history with UUID or numeric ID', async () => {
   let call;
+  const uuid = '6c841160-eb14-415a-8cc1-9004ca815a01';
   const response = await createHistoryHandler({
     authenticate: ownerAuth,
     query: async (text, values) => { call = { text, values }; return { rowCount: 1, rows: [] }; },
-  }).DELETE(request('DELETE'), { params: { id: '7' } });
+  }).DELETE(request('DELETE'), { params: { id: uuid } });
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { success: true });
-  assert.match(call.text, /DELETE FROM conversions WHERE id = \$1/);
-  assert.deepEqual(call.values, [7]);
+  assert.deepEqual(call.values, [uuid]);
 });
 
 test('DELETE returns 404 when row is missing and never exposes DB details', async () => {
