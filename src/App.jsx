@@ -549,11 +549,30 @@ export default function App() {
       },
       (err) => {
         console.warn('GPS Error:', err.message);
+        // Fallback retry dengan enableHighAccuracy: false jika high accuracy timeout/gagal
+        if (err?.code === 3 || err?.code === 2) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude } = pos.coords;
+              setUserLocation({ lat: latitude, lng: longitude });
+              setLocationStatus(`📍 GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+              setLocatingUser(false);
+              loadSpots(latitude, longitude, spotFilter);
+            },
+            (retryErr) => {
+              setLocationStatus(locationErrorMessage(retryErr));
+              setSpotsList([]);
+              setLocatingUser(false);
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+          );
+          return;
+        }
         setLocationStatus(locationErrorMessage(err));
         setSpotsList([]);
         setLocatingUser(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
   };
 
@@ -616,7 +635,7 @@ export default function App() {
     }
   };
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -630,6 +649,9 @@ export default function App() {
     }
 
     try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        await navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => stream.getTracks().forEach(t => t.stop())).catch(() => {});
+      }
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;

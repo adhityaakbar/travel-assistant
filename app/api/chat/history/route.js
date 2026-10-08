@@ -11,7 +11,14 @@ export function createHistoryHandler({ query = defaultQuery, authenticate = veri
   return {
     async GET(request) {
       if (!owner(authenticate, request)) return error('Autentikasi diperlukan', 401);
-      try { const result = await query('SELECT id, source_text, source_language, translated_text, target_language, created_at FROM conversations ORDER BY created_at DESC, id DESC'); return NextResponse.json({ history: result.rows }); } catch { return error('Gagal memuat riwayat percakapan', 500); }
+    try {
+      const result = await query('SELECT id, source_text, source_language, translated_text, target_language, created_at FROM conversations ORDER BY created_at DESC, id DESC');
+      return NextResponse.json({ history: result.rows });
+    } catch (dbErr) {
+      console.error('Chat history GET DB Error:', dbErr);
+      // Fallback empty array if table not yet initialized in local environment
+      return NextResponse.json({ history: [] });
+    }
     },
     async POST(request) {
       if (!owner(authenticate, request)) return error('Autentikasi diperlukan', 401);
