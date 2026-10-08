@@ -69,7 +69,7 @@ jobs:
 
             echo '==> Reloading PM2 & Nginx...'
             pm2 delete travel-assistant 2>/dev/null || true
-            pm2 start server/index.js --name 'travel-assistant'
+            pm2 start npm --name 'travel-assistant' -- start
             pm2 save
             systemctl reload nginx
             echo '==> Deployment successful!'

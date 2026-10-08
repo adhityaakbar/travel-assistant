@@ -1,11 +1,10 @@
 import pg from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const { Pool } = pg;
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:guardian8@192.168.100.187:5432/travelassistant_db';
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) throw new Error('DATABASE_URL wajib diatur di .env');
 
 export const pool = new Pool({
   connectionString,
