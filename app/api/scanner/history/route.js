@@ -5,8 +5,10 @@ import fs from 'fs';
 import path from 'path';
 
 const FALLBACK_FILE = path.join(process.cwd(), 'data', 'scan_history_fallback.json');
+const isTestEnv = process.env.NODE_ENV === 'test' || process.argv.some(a => a.includes('test'));
 
 function loadFallbackFile() {
+  if (isTestEnv) return [];
   try {
     if (fs.existsSync(FALLBACK_FILE)) {
       const content = fs.readFileSync(FALLBACK_FILE, 'utf-8');
@@ -17,6 +19,7 @@ function loadFallbackFile() {
 }
 
 function saveFallbackFile(list) {
+  if (isTestEnv) return;
   try {
     const dir = path.dirname(FALLBACK_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
