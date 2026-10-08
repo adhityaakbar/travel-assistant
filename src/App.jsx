@@ -18,6 +18,7 @@ import {
   User,
   ShieldCheck,
   Lock,
+  Compass,
   Upload,
   SwitchCamera,
   Navigation,
@@ -295,9 +296,45 @@ export default function App() {
     }
   };
 
+  const requestAllPermissions = async () => {
+    let statusText = [];
+
+    // 1. Location
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          setLocationError(null);
+        },
+        (err) => {
+          setLocationError('Izin lokasi ditolak/tidak aktif di browser.');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    // 2. Camera
+    try {
+      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        camStream.getTracks().forEach(t => t.stop());
+      }
+    } catch {
+      setScanError('Izin kamera ditolak di browser.');
+    }
+
+    // 3. Microphone
+    try {
+      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStream.getTracks().forEach(t => t.stop());
+      }
+    } catch {
+      // mic permission denied silently or prompt
+    }
+  };
+
   const toggleCameraFacing = () => {
-    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
-    setFacingMode(nextMode);
     if (isCameraActive) cameraControllerRef.current.scheduleRestart(startCamera);
   };
 
@@ -636,8 +673,8 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-3xl shadow-xs">
-              ✈️
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs">
+              <Compass size={32} />
             </div>
             <h1 className="text-2xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant Japan</h1>
             <p className="text-xs text-slate-500 font-medium">Masuk untuk mengakses kurs live, scanner harga AI & spot kalcer</p>
