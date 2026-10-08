@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
-import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots } from './spots.js';
+import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCodeFromCoords } from './spots.js';
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
@@ -93,15 +93,25 @@ export default function App() {
   const DEFAULT_JAKSEL_LOCATION = { lat: -6.2615, lng: 106.8106 }; // Jakarta Selatan
 
   // Spot Kalcer State
-  const [userLocation, setUserLocation] = useState(DEFAULT_JAKSEL_LOCATION);
+  const [userLocation, setUserLocation] = useState(null);
   const [locatingUser, setLocatingUser] = useState(false);
-  const [locationStatus, setLocationStatus] = useState('📍 Jakarta Selatan (GPS Terdekat)');
+  const [locationStatus, setLocationStatus] = useState('Meminta lokasi GPS...');
   const [spotFilter, setSpotFilter] = useState('all');
   const [spotsList, setSpotsList] = useState([]);
   const [loadingSpots, setLoadingSpots] = useState(false);
+  const [countryCode, setCountryCode] = useState('JPN');
+  const [customCategories, setCustomCategories] = useState([]);
+  const [newCatInput, setNewCatInput] = useState('');
+  // Quick Phrases CRUD state
+  const [phrasesList, setPhrasesList] = useState(QUICK_PHRASES);
+  const [editingPhraseIndex, setEditingPhraseIndex] = useState(null);
+  const [phraseModalOpen, setPhraseModalOpen] = useState(false);
+  const [phraseInputText, setPhraseInputText] = useState('');
+  const [phraseInputCategory, setPhraseInputCategory] = useState('🗣️ Dasar');
 
-  // 1. Initial Load: Check Auth Token & Initial Data
+  // 1. Initial Load: Auto request GPS location, Auth Token & Initial Data
   useEffect(() => {
+    requestUserLocation();
     if (token) {
       axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
         .then(res => {
@@ -116,6 +126,7 @@ export default function App() {
     loadLiveRates();
     loadConversionHistory();
     loadScanHistory();
+    loadChatHistory();
   }, [token]);
 
   // Handle Login
@@ -542,7 +553,7 @@ export default function App() {
   // 4. Kalcer Geolocation & Places API Integration
   const requestUserLocation = () => {
     if (!('geolocation' in navigator)) {
-      alert('Geolocation tidak didukung pada browser ini.');
+      setLocationStatus('Geolocation tidak didukung browser ini.');
       return;
     }
     setLocatingUser(true);
@@ -552,6 +563,7 @@ export default function App() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserLocation({ lat: latitude, lng: longitude });
+        setCountryCode(getCountryCodeFromCoords(latitude, longitude));
         setLocationStatus(`📍 GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         setLocatingUser(false);
         loadSpots(latitude, longitude, spotFilter);
@@ -559,6 +571,7 @@ export default function App() {
       (err) => {
         console.warn('GPS Error, fallback ke Jakarta Selatan:', err.message);
         setUserLocation(DEFAULT_JAKSEL_LOCATION);
+        setCountryCode(getCountryCodeFromCoords(DEFAULT_JAKSEL_LOCATION.lat, DEFAULT_JAKSEL_LOCATION.lng));
         setLocationStatus(`📍 Jakarta Selatan: ${DEFAULT_JAKSEL_LOCATION.lat.toFixed(4)}, ${DEFAULT_JAKSEL_LOCATION.lng.toFixed(4)}`);
         setLocatingUser(false);
         loadSpots(DEFAULT_JAKSEL_LOCATION.lat, DEFAULT_JAKSEL_LOCATION.lng, spotFilter);
@@ -651,7 +664,10 @@ export default function App() {
       };
       recognition.onresult = (event) => {
         const transcript = event.results[0]?.[0]?.transcript;
-        if (transcript) updateChatInput(transcript);
+        if (transcript) {
+          updateChatInput(transcript);
+          translateMessage(transcript);
+        }
         setIsListening(false);
       };
       recognition.onerror = (event) => {
@@ -778,11 +794,8 @@ export default function App() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</span>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">JPN</span>
+              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">{countryCode}</span>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Halo, <span className="font-bold text-slate-800">Pemilik</span>
-            </p>
           </div>
           
                 <div className="flex items-center gap-1.5">
@@ -813,7 +826,7 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900">Valas & Kurs Live</h1>
+                  <h1 className="text-xl font-bold font-heading text-slate-900">Valas & Kurs Rate</h1>
                   <p className="text-xs text-slate-500">
                     1 {activeChip} = {formatChipRate(ratesData, activeChip)} • {rateSource === 'bca' ? 'BCA e-Rate' : 'Live Rate'}
                   </p>
@@ -1199,17 +1212,48 @@ export default function App() {
                   </select>
                 </div>
 
-                <input 
-                  type="text" 
-                  value={inputText}
-                  onChange={(e) => updateChatInput(e.target.value)}
-                  placeholder="Ketik kalimat atau tekan mic untuk bicara..."
-                  className="w-full text-center text-base sm:text-sm p-2 outline-none text-slate-800 placeholder-slate-400 border-b border-slate-100"
-                />
+                {/* Input Controls Bar */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      value={inputText}
+                      onChange={(e) => updateChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          translateMessage();
+                        }
+                      }}
+                      placeholder="Ketik kalimat atau tekan mic untuk bicara..."
+                      className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition"
+                    />
 
-                <button onClick={translateMessage} disabled={chatLoading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition disabled:opacity-60">
-                  {chatLoading ? 'Menerjemahkan...' : `Terjemahkan (${getLanguageLabel(sourceLanguage)} → ${getLanguageLabel(targetLanguage)})`}
-                </button>
+                    <button 
+                      onClick={toggleListening}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center text-white shrink-0 shadow-xs transition active:scale-95 ${
+                        isListening ? 'bg-red-500 animate-pulse ring-2 ring-red-300' : 'bg-slate-800 hover:bg-slate-900'
+                      }`}
+                      title="Tekan untuk Bicara (Web Speech API)"
+                    >
+                      <Mic size={16} />
+                    </button>
+
+                    <button 
+                      onClick={() => translateMessage()} 
+                      disabled={chatLoading} 
+                      className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 shadow-xs transition disabled:opacity-60"
+                    >
+                      {chatLoading ? 'Sync...' : 'Kirim'}
+                    </button>
+                  </div>
+
+                  {isListening && (
+                    <p className="text-[11px] text-red-500 font-medium text-center animate-pulse">
+                      🎙️ Mendengarkan suara... Bicara sekarang
+                    </p>
+                  )}
+                </div>
                 {chatError && (
                   <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 flex flex-wrap items-center justify-between gap-2 text-xs text-red-700">
                     <p role="alert" className="flex-1 font-medium">{chatError}</p>
@@ -1233,61 +1277,70 @@ export default function App() {
                 
                 {translatedText && (
                   <div className="space-y-3 text-left pt-2 border-t border-slate-100 animate-in fade-in">
-                    <div className="flex justify-start">
-                      <div className="max-w-[90%] bg-slate-100 rounded-2xl px-3.5 py-2.5 text-xs text-slate-800 space-y-1">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">{getLanguageLabel(sourceLanguage)}</div>
-                        <div>{inputText}</div>
+                    {/* Chat Bubble Layout */}
+                    <div className="space-y-2">
+                      <div className={`flex ${getBubbleSide(sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs space-y-1 ${
+                          getBubbleSide(sourceLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-900'
+                        }`}>
+                          <div className={`text-[10px] font-bold uppercase ${getBubbleSide(sourceLanguage) === 'right' ? 'text-blue-100' : 'text-slate-500'}`}>
+                            {getLanguageLabel(sourceLanguage)}
+                          </div>
+                          <div className="font-medium">{inputText}</div>
+                        </div>
+                      </div>
+
+                      <div className={`flex ${getBubbleSide(targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs space-y-1 relative shadow-xs ${
+                          getBubbleSide(targetLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
+                        }`}>
+                          <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-1 mb-1">
+                            <span className="text-[10px] text-white/80 font-bold uppercase">{getLanguageLabel(targetLanguage)}</span>
+                            <button 
+                              onClick={() => playAudio(translatedText, targetLanguage, 'active-trans')}
+                              className="p-1 hover:bg-white/20 rounded-md transition text-white"
+                              title="Putar Audio Suara (ElevenLabs / TTS)"
+                            >
+                              <Volume2 size={14} className={playingAudioId === 'active-trans' ? 'animate-bounce text-yellow-300' : ''} />
+                            </button>
+                          </div>
+                          <div className="whitespace-pre-line leading-relaxed font-medium">
+                            {translatedText.split('\n').map((line, idx) => {
+                              if (line.includes('**')) {
+                                const parts = line.split(/(\*\*.*?\*\*)/g);
+                                return (
+                                  <div key={idx} className="text-sm font-bold tracking-wide">
+                                    {parts.map((p, pIdx) => p.startsWith('**') && p.endsWith('**') ? <strong key={pIdx} className="text-yellow-200">{p.slice(2, -2)}</strong> : p)}
+                                  </div>
+                                );
+                              }
+                              return <div key={idx} className={idx > 0 ? "text-xs italic text-blue-100 mt-0.5" : "text-sm"}>{line}</div>;
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
-                      <div className="max-w-[90%] bg-blue-600 text-white rounded-2xl px-3.5 py-2.5 text-xs space-y-1 shadow-xs relative">
-                        <div className="flex items-center justify-between gap-2 border-b border-blue-500/50 pb-1 mb-1">
-                          <span className="text-[10px] text-blue-200 font-bold uppercase">{getLanguageLabel(targetLanguage)}</span>
-                          <button 
-                            onClick={() => playAudio(translatedText, targetLanguage, 'active-trans')}
-                            className="p-1 hover:bg-blue-500 rounded-md transition text-white"
-                            title="Putar Audio Suara (ElevenLabs / TTS)"
-                          >
-                            <Volume2 size={14} className={playingAudioId === 'active-trans' ? 'animate-bounce text-yellow-300' : ''} />
-                          </button>
-                        </div>
-                        <div className="whitespace-pre-line leading-relaxed font-medium">
-                          {translatedText.split('\n').map((line, idx) => {
-                            if (line.includes('**')) {
-                              const parts = line.split(/(\*\*.*?\*\*)/g);
-                              return (
-                                <div key={idx} className="text-sm font-bold tracking-wide">
-                                  {parts.map((p, pIdx) => p.startsWith('**') && p.endsWith('**') ? <strong key={pIdx} className="text-yellow-200">{p.slice(2, -2)}</strong> : p)}
-                                </div>
-                              );
-                            }
-                            return <div key={idx} className={idx > 0 ? "text-xs italic text-blue-100 mt-0.5" : "text-sm"}>{line}</div>;
-                          })}
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={saveChat} disabled={chatSaving || !isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)} className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50">
+                        {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan'}
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setInputText('');
+                          setTranslatedText('');
+                          setTranslationSnapshot(null);
+                        }} 
+                        className="px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition"
+                      >
+                        🗑️ Hapus
+                      </button>
                     </div>
-
-                    <button onClick={saveChat} disabled={chatSaving || !isTranslationCurrent({ sourceText: inputText, sourceLanguage, translatedText, targetLanguage }, translationSnapshot)} className="w-full py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50">
-                      {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan'}
-                    </button>
                   </div>
                 )}
 
                 <div className="flex justify-center pt-2">
-                  <button 
-                    onClick={toggleListening}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center text-xl text-white shadow-lg transition active:scale-95 ${
-                      isListening ? 'bg-red-500 animate-pulse ring-4 ring-red-200' : 'bg-blue-600 hover:bg-blue-700'
-                    }`}
-                    title="Tekan untuk Bicara (Web Speech API)"
-                  >
-                    <Mic size={24} />
-                  </button>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">
-                  {isListening ? '🎙️ Mendengarkan suara Anda...' : 'Tekan tombol mic untuk mulai rekam'}
-                </p>
               </div>
 
               {/* History Percakapan */}
@@ -1322,13 +1375,23 @@ export default function App() {
               {/* Quick Phrases */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-sm font-bold font-heading text-slate-900">Frasa Cepat Praktis</h2>
-                  <span className="text-xs text-slate-400 font-medium">Filter Kategori</span>
+                  <h2 className="text-sm font-bold font-heading text-slate-900">Frasa Cepat Praktis ({phrasesList.length})</h2>
+                  <button
+                    onClick={() => {
+                      setEditingPhraseIndex(null);
+                      setPhraseInputText('');
+                      setPhraseInputCategory('🗣️ Dasar');
+                      setPhraseModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
+                  >
+                    + Tambah Frasa
+                  </button>
                 </div>
 
                 {/* Category Filter Chips */}
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2.5">
-                  {['Semua', ...Array.from(new Set(QUICK_PHRASES.map(p => p.category)))].map((cat) => (
+                  {['Semua', ...Array.from(new Set(phrasesList.map(p => p.category)))].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setSelectedPhraseCategory(cat)}
@@ -1344,25 +1407,101 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {QUICK_PHRASES.filter(p => selectedPhraseCategory === 'Semua' || p.category === selectedPhraseCategory).map((phrase, idx) => (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center shadow-2xs hover:border-blue-300 transition">
-                      <div className="space-y-0.5 min-w-0 pr-2">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{phrase.category}</span>
-                        <div className="text-xs font-medium text-slate-800 line-clamp-2 mt-1">{phrase.text}</div>
+                  {phrasesList.filter(p => selectedPhraseCategory === 'Semua' || p.category === selectedPhraseCategory).map((phrase, idx) => {
+                    const realIndex = phrasesList.findIndex(p => p === phrase);
+                    return (
+                      <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-blue-300 transition">
+                        <div 
+                          onClick={() => updateChatInput(phrase.text)}
+                          className="space-y-0.5 min-w-0 pr-2 cursor-pointer flex-1"
+                        >
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{phrase.category}</span>
+                          <div className="text-xs font-medium text-slate-800 line-clamp-2 mt-1">{phrase.text}</div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingPhraseIndex(realIndex);
+                              setPhraseInputText(phrase.text);
+                              setPhraseInputCategory(phrase.category);
+                              setPhraseModalOpen(true);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 p-1 text-xs font-semibold"
+                            title="Edit Frasa"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPhrasesList(prev => prev.filter((_, i) => i !== realIndex));
+                            }}
+                            className="text-slate-400 hover:text-red-500 p-1 text-xs font-semibold"
+                            title="Hapus Frasa"
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
-                      <button 
-                        onClick={() => {
-                          setInputText(phrase.text);
-                          translateMessage(phrase.text);
-                        }}
-                        className="px-2.5 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold shrink-0 transition"
-                      >
-                        Terjemahkan
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
+
+              {/* Modal Add/Edit Phrase */}
+              {phraseModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+                  <div className="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-xl">
+                    <h3 className="text-sm font-bold font-heading text-slate-900">
+                      {editingPhraseIndex !== null ? 'Edit Frasa Cepat' : 'Tambah Frasa Cepat Baru'}
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700">Kategori</label>
+                      <input 
+                        type="text"
+                        value={phraseInputCategory}
+                        onChange={(e) => setPhraseInputCategory(e.target.value)}
+                        placeholder="Contoh: 🚨 Darurat, 🍣 Makanan"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700">Teks Frasa</label>
+                      <textarea
+                        value={phraseInputText}
+                        onChange={(e) => setPhraseInputText(e.target.value)}
+                        placeholder="Tulis frasa praktis..."
+                        rows={3}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none resize-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button 
+                        onClick={() => setPhraseModalOpen(false)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                      >
+                        Batal
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (!phraseInputText.trim()) return;
+                          if (editingPhraseIndex !== null) {
+                            setPhrasesList(prev => prev.map((p, i) => i === editingPhraseIndex ? { category: phraseInputCategory.trim() || '🗣️ Dasar', text: phraseInputText.trim() } : p));
+                          } else {
+                            setPhrasesList(prev => [...prev, { category: phraseInputCategory.trim() || '🗣️ Dasar', text: phraseInputText.trim() }]);
+                          }
+                          setPhraseModalOpen(false);
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+                      >
+                        Simpan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1374,6 +1513,11 @@ export default function App() {
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-xl font-bold font-heading text-slate-900">Spot Kalcer 📍</h1>
+                  {userLocation && (
+                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                      GPS: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={requestUserLocation}
@@ -1389,9 +1533,9 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Category Filter Chips */}
-              <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
-                {SPOT_CATEGORIES.map(c => (
+              {/* Category Filter Chips & Add Category */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                {SPOT_CATEGORIES.concat(customCategories).map(c => (
                   <button
                     key={c.id}
                     onClick={() => handleSpotFilterChange(c.id)}
@@ -1404,6 +1548,12 @@ export default function App() {
                     {c.label}
                   </button>
                 ))}
+                <button
+                  onClick={() => setShowAddCatModal(true)}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap transition shadow-2xs"
+                >
+                  + Kategori
+                </button>
               </div>
 
               {/* Spot Cards */}
@@ -1421,8 +1571,12 @@ export default function App() {
                   spotsList.map(s => (
                     <div key={s.id} className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
                       <div className="flex gap-3">
-                        <div className="w-16 h-16 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center text-2xl shrink-0">
-                          {s.icon || '📍'}
+                        <div className="w-16 h-16 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                          {s.photoUrl ? (
+                            <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-2xl">{s.icon || '📍'}</span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-bold text-slate-900 truncate">{s.name}</div>
@@ -1461,6 +1615,47 @@ export default function App() {
                   ))
                 )}
               </div>
+
+              {/* Modal Add Custom Category */}
+              {showAddCatModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in">
+                  <div className="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-xl">
+                    <h3 className="text-sm font-bold font-heading text-slate-900">Tambah Kategori Spot Baru</h3>
+                    <p className="text-xs text-slate-500">
+                      Masukkan nama kategori (contoh: toys, ramen, souvenirs). Sistem akan mencari atraksi terdekat.
+                    </p>
+                    <input 
+                      type="text"
+                      value={newCatInput}
+                      onChange={(e) => setNewCatInput(e.target.value)}
+                      placeholder="Nama kategori..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 outline-none"
+                    />
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button 
+                        onClick={() => setShowAddCatModal(false)}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition"
+                      >
+                        Batal
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (!newCatInput.trim()) return;
+                          const catId = newCatInput.trim().toLowerCase().replace(/\s+/g, '_');
+                          const newCatObj = { id: catId, label: `✨ ${newCatInput.trim()}` };
+                          setCustomCategories(prev => [...prev, newCatObj]);
+                          setNewCatInput('');
+                          setShowAddCatModal(false);
+                          handleSpotFilterChange(catId);
+                        }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+                      >
+                        Tambah & Cari
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

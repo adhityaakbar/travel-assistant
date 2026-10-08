@@ -1,3 +1,10 @@
+export function getCountryCodeFromCoords(lat, lng) {
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return 'JPN';
+  if (lat >= -11.0 && lat <= 6.0 && lng >= 95.0 && lng <= 141.0) return 'IDN';
+  if (lat >= 24.0 && lat <= 46.0 && lng >= 122.0 && lng <= 154.0) return 'JPN';
+  return 'JPN';
+}
+
 export const SPOT_CATEGORIES = [
   { id: 'all', label: '🔥 Semua' },
   { id: 'foto', label: '📸 Foto' },
