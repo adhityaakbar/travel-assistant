@@ -726,7 +726,7 @@ export default function App() {
             <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs">
               <Compass size={32} />
             </div>
-            <h1 className="text-2xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant Japan</h1>
+            <h1 className="text-2xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</h1>
             <p className="text-xs text-slate-500 font-medium">Masuk untuk mengakses kurs live, scanner harga AI & spot kalcer</p>
           </div>
 
