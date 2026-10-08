@@ -771,6 +771,13 @@ export default function App() {
             </button>
           </form>
 
+          {/* Version Tracking Footer */}
+          <div className="pt-2 text-center border-t border-slate-100">
+            <span className="text-[10px] font-mono text-slate-400">
+              Build Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.0.0-latest'}
+            </span>
+          </div>
+
         </div>
       </div>
     );
@@ -1180,7 +1187,7 @@ export default function App() {
                     className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`src-${lang.code}`} value={lang.code}>
+                      <option key={`src-${lang.code}`} value={lang.code.split('-')[0]}>
                         {lang.flag} {lang.name}
                       </option>
                     ))}
@@ -1205,7 +1212,7 @@ export default function App() {
                     className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`tgt-${lang.code}`} value={lang.code}>
+                      <option key={`tgt-${lang.code}`} value={lang.code.split('-')[0]}>
                         {lang.flag} {lang.name}
                       </option>
                     ))}
