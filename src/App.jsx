@@ -24,7 +24,8 @@ import {
   Navigation,
   BookmarkPlus,
   Pencil,
-  Trash2
+  Trash2,
+  Copy
 } from 'lucide-react';
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
@@ -71,7 +72,12 @@ export default function App() {
   const [capturedImage, setCapturedImage] = useState(null);
   const [scannedResult, setScannedResult] = useState(null);
   const [scanHistoryList, setScanHistoryList] = useState([]);
+  const [allScanHistoryList, setAllScanHistoryList] = useState([]);
+  const [showAllScanHistoryModal, setShowAllScanHistoryModal] = useState(false);
+  const [copiedHistoryId, setCopiedHistoryId] = useState(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
+  const [copiedProductName, setCopiedProductName] = useState(false);
   const [scanError, setScanError] = useState('');
   const [scanSaving, setScanSaving] = useState(false);
   const [scannedResultSaved, setScannedResultSaved] = useState(false);
@@ -175,6 +181,9 @@ export default function App() {
         setToken(res.data.token);
         setUser(res.data.user);
         requestUserLocation();
+        loadScanHistory();
+        loadChatHistory();
+        loadConversionHistory();
       }
     } catch (err) {
       setLoginError(err.response?.data?.error || 'Gagal login. Pastikan passcode benar.');
@@ -187,6 +196,9 @@ export default function App() {
     localStorage.removeItem('travel_assistant_token');
     setToken('');
     setUser(null);
+    setScanHistoryList([]);
+    setChatHistory([]);
+    setConversionHistory([]);
     stopCamera();
   };
 
@@ -491,32 +503,68 @@ export default function App() {
     }
   };
 
+  const getAuthToken = () => token || (typeof window !== 'undefined' ? localStorage.getItem('travel_assistant_token') || '' : '');
+
   const saveScannedResultToHistory = async () => {
     if (!scannedResult || scanSaving) return;
     setScanSaving(true);
+    const authToken = getAuthToken();
     try {
-      await axios.post('/api/scanner/history', scannedResult, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.post('/api/scanner/history', scannedResult, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
       });
       setScannedResultSaved(true);
+      if (res.data && res.data.item) {
+        setScanHistoryList(prev => [res.data.item, ...prev.filter(i => String(i.id) !== String(res.data.item.id))]);
+      }
       await loadScanHistory();
     } catch (err) {
       console.warn('Scan history save error:', err);
       setScannedResultSaved(true);
-      await loadScanHistory();
+      setScanHistoryList(prev => [
+        { id: `scan-${Date.now()}`, ...scannedResult, created_at: new Date().toISOString() },
+        ...prev
+      ]);
     } finally {
       setScanSaving(false);
     }
   };
 
   const loadScanHistory = async () => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
     try {
-      const res = await axios.get('/api/scanner/history', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get('/api/scanner/history?limit=15', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
       if (res.data && res.data.history) {
         setScanHistoryList(res.data.history);
       }
     } catch (err) {
       console.warn('Scan history error:', err);
+    }
+  };
+
+  const handleCopyHistoryTitle = (title, id) => {
+    if (!title) return;
+    navigator.clipboard.writeText(title);
+    setCopiedHistoryId(id);
+    setTimeout(() => setCopiedHistoryId(null), 2000);
+  };
+
+  const loadAllScanHistory = async () => {
+    const authToken = getAuthToken();
+    if (!authToken) return;
+    try {
+      const res = await axios.get('/api/scanner/history?all=true', {
+        headers: { Authorization: `Bearer ${authToken}` }
+      });
+      if (res.data && res.data.history) {
+        setAllScanHistoryList(res.data.history);
+        setShowAllScanHistoryModal(true);
+      }
+    } catch (err) {
+      console.warn('Load all scan history error:', err);
     }
   };
 
@@ -924,6 +972,7 @@ export default function App() {
               <span className="text-xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</span>
               <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">{countryCode}</span>
             </div>
+            <div className="text-[10px] text-slate-400 font-mono font-medium -mt-0.5">v1.4.0</div>
           </div>
           
           <div className="flex items-center gap-1.5">
@@ -1210,8 +1259,15 @@ export default function App() {
                     ✕
                   </button>
                   {scannedResult.image_url && (
-                    <div className="w-full h-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center">
-                      <img src={scannedResult.image_url} alt="Scanned" className="w-full h-full object-cover" />
+                    <div 
+                      onClick={() => setPreviewImageUrl(scannedResult.image_url)}
+                      className="w-full h-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center cursor-pointer hover:opacity-90 transition group relative"
+                      title="Klik untuk memperbesar gambar"
+                    >
+                      <img src={scannedResult.image_url} alt="Scanned" className="w-full h-full object-cover group-hover:scale-102 transition duration-300" />
+                      <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1 backdrop-blur-3xs">
+                        🔍 Perbesar Gambar
+                      </div>
                     </div>
                   )}
 
@@ -1223,7 +1279,33 @@ export default function App() {
                     {scannedResult.confidence != null && <span className="text-xs text-slate-400">Confidence {scannedResult.confidence}</span>}
                   </div>
 
-                  <h2 className="text-base font-bold font-heading text-slate-900 pr-8">{scannedResult.product_name}</h2>
+                  <div className="flex items-center gap-2 pr-8">
+                    <h2 className="text-base font-bold font-heading text-slate-900">{scannedResult.product_name}</h2>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (scannedResult.product_name) {
+                          navigator.clipboard?.writeText(scannedResult.product_name);
+                          setCopiedProductName(true);
+                          setTimeout(() => setCopiedProductName(false), 2000);
+                        }
+                      }}
+                      className="p-1 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200/80"
+                      title="Salin Nama Barang"
+                    >
+                      {copiedProductName ? (
+                        <>
+                          <Check size={13} className="text-emerald-600" />
+                          <span className="text-[11px] text-emerald-700 font-semibold">Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} />
+                          <span className="text-[11px] font-medium">Salin</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                   <div className="flex items-center gap-2">
                     {scannedResult.location_name && (
@@ -1316,7 +1398,21 @@ export default function App() {
 
               {/* Scan History from Supabase */}
               <div>
-                <h2 className="text-sm font-bold font-heading text-slate-900 mb-2.5">Riwayat Scan Tersimpan</h2>
+                <div className="flex items-center justify-between mb-2.5">
+                  <h2 className="text-sm font-bold font-heading text-slate-900">Riwayat Scan Tersimpan</h2>
+                  <button
+                    type="button"
+                    onClick={loadAllScanHistory}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5"
+                  >
+                    <span>Tampilkan Semua</span>
+                    {scanHistoryList.length > 0 && (
+                      <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.2 rounded-full font-bold">
+                        {scanHistoryList.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
                 <div className="space-y-2">
                   {scanHistoryList.length === 0 ? (
                     <div className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">
@@ -1329,7 +1425,9 @@ export default function App() {
                           <img 
                             src={item.image_url} 
                             alt={item.product_name} 
-                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200" 
+                            onClick={() => setPreviewImageUrl(item.image_url)}
+                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-pointer hover:opacity-85 transition hover:scale-105" 
+                            title="Klik untuk memperbesar gambar"
                           />
                         ) : (
                           <div className="w-14 h-14 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-xl font-bold border border-slate-200">
@@ -1337,7 +1435,21 @@ export default function App() {
                           </div>
                         )}
                         <div className="min-w-0 flex-1 pr-1">
-                          <div className="text-sm font-bold text-slate-900 truncate">{item.product_name}</div>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-sm font-bold text-slate-900 truncate">{item.product_name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyHistoryTitle(item.product_name, item.id || idx)}
+                              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
+                              title="Salin Nama Produk"
+                            >
+                              {copiedHistoryId === (item.id || idx) ? (
+                                <Check size={13} className="text-emerald-600 font-bold" />
+                              ) : (
+                                <Copy size={13} />
+                              )}
+                            </button>
+                          </div>
                           <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
                             <span>•</span>
@@ -2043,6 +2155,103 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              {/* Modal All Scan History */}
+              {showAllScanHistoryModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+                  <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                      <div>
+                        <h3 className="text-sm font-bold font-heading text-slate-900">Semua Riwayat Scan Tersimpan</h3>
+                        <p className="text-[11px] text-slate-500">Daftar lengkap hasil scan harga & estimasi lokasi</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowAllScanHistoryModal(false)}
+                        className="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-600 text-sm font-bold transition"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
+                      {allScanHistoryList.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-slate-400">Belum ada riwayat scan tersimpan.</div>
+                      ) : (
+                        allScanHistoryList.map((item, idx) => (
+                          <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs gap-3">
+                            {item.image_url ? (
+                              <img 
+                                src={item.image_url} 
+                                alt={item.product_name} 
+                                onClick={() => setPreviewImageUrl(item.image_url)}
+                                className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-pointer hover:opacity-85 transition hover:scale-105" 
+                                title="Klik untuk memperbesar gambar"
+                              />
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-xl font-bold border border-slate-200">
+                                📷
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1 pr-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-bold text-slate-900 truncate">{item.product_name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyHistoryTitle(item.product_name, `modal-${item.id || idx}`)}
+                                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
+                                  title="Salin Nama Produk"
+                                >
+                                  {copiedHistoryId === `modal-${item.id || idx}` ? (
+                                    <Check size={13} className="text-emerald-600 font-bold" />
+                                  ) : (
+                                    <Copy size={13} />
+                                  )}
+                                </button>
+                              </div>
+                              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
+                                <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
+                                <span>•</span>
+                                <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
+                                {(item.location_name || item.locationName) && (
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">
+                                    📍 {item.location_name || item.locationName}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 flex items-center gap-2">
+                              <div>
+                                <div className="text-sm font-bold text-emerald-600">
+                                  {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
+                                </div>
+                                <div className="text-[10px] text-slate-400">Estimasi Indo</div>
+                              </div>
+                              {item.id && (
+                                <button
+                                  onClick={() => deleteScanHistoryItem(item.id)}
+                                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-xs font-bold transition"
+                                  title="Hapus riwayat scan"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                      <button
+                        onClick={() => setShowAllScanHistoryModal(false)}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2090,6 +2299,33 @@ export default function App() {
             <span className="text-[11px]">Kalcer</span>
           </button>
         </nav>
+
+        {/* Modal Image Lightbox Preview (Global Root Level) */}
+        {previewImageUrl && (
+          <div 
+            className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
+            onClick={() => setPreviewImageUrl(null)}
+          >
+            <div 
+              className="relative max-w-2xl w-full bg-slate-950 rounded-2xl p-2 border border-slate-800 shadow-2xl overflow-hidden cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white flex items-center justify-center text-base font-bold transition z-10 border border-slate-700/50"
+                title="Tutup gambar"
+              >
+                ✕
+              </button>
+              <img 
+                src={previewImageUrl} 
+                alt="Pratinjau Hasil Scan" 
+                className="w-full max-h-[75vh] object-contain rounded-xl shadow-lg"
+              />
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

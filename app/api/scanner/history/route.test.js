@@ -34,6 +34,8 @@ test('scanner history rejects authenticated non-owner requests before query', as
 });
 
 test('scanner history returns normalized owner history', async () => {
+  const { inMemoryScanHistory } = await import('./route.js');
+  inMemoryScanHistory.length = 0;
   const item = { id: 1, product_name: 'Camera', price_jpy: 42000, lowest_price_idr: 4500000 };
   const GET = createHistoryHandler({
     authenticate: () => ({ role: 'owner' }),

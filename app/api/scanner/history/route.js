@@ -1,26 +1,30 @@
 import { NextResponse } from 'next/server.js';
 import { query } from '../../../../server/db.js';
 import { verifyToken } from '../../../../server/auth.js';
+import fs from 'fs';
+import path from 'path';
 
-const INSERT_WITH_IMAGE = `INSERT INTO scan_history (
-  product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr,
-  currency, marketplace, marketplace_url, tokopedia_url, shopee_url,
-  confidence, estimate_note, is_estimate, latitude, longitude, location_name, image_url
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-RETURNING id, product_name, brand, model, price_jpy, lowest_price_idr,
-  average_price_idr, currency, marketplace, marketplace_url, tokopedia_url,
-  shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, image_url, created_at`;
+const FALLBACK_FILE = path.join(process.cwd(), 'data', 'scan_history_fallback.json');
 
-const INSERT_NO_IMAGE = `INSERT INTO scan_history (
-  product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr,
-  currency, marketplace, marketplace_url, tokopedia_url, shopee_url,
-  confidence, estimate_note, is_estimate, latitude, longitude, location_name
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-RETURNING id, product_name, brand, model, price_jpy, lowest_price_idr,
-  average_price_idr, currency, marketplace, marketplace_url, tokopedia_url,
-  shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, created_at`;
+function loadFallbackFile() {
+  try {
+    if (fs.existsSync(FALLBACK_FILE)) {
+      const content = fs.readFileSync(FALLBACK_FILE, 'utf-8');
+      return JSON.parse(content) || [];
+    }
+  } catch {}
+  return [];
+}
 
-export let inMemoryScanHistory = [];
+function saveFallbackFile(list) {
+  try {
+    const dir = path.dirname(FALLBACK_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(FALLBACK_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  } catch {}
+}
+
+export let inMemoryScanHistory = loadFallbackFile();
 
 export function createHistoryHandler({ authenticate = verifyToken, query: runQuery = query } = {}) {
   return async function GET(request) {
@@ -28,11 +32,42 @@ export function createHistoryHandler({ authenticate = verifyToken, query: runQue
       const auth = authenticate(request);
       if (!auth || auth.role !== 'owner') return NextResponse.json({ error: 'Autentikasi diperlukan' }, { status: 401 });
       try {
+        try {
+          await runQuery(`CREATE TABLE IF NOT EXISTS scan_history (
+            id SERIAL PRIMARY KEY,
+            product_name TEXT NOT NULL,
+            brand TEXT,
+            model TEXT,
+            price_jpy NUMERIC,
+            lowest_price_idr NUMERIC,
+            average_price_idr NUMERIC,
+            currency TEXT DEFAULT 'JPY',
+            marketplace TEXT,
+            marketplace_url TEXT,
+            tokopedia_url TEXT,
+            shopee_url TEXT,
+            confidence NUMERIC,
+            estimate_note TEXT,
+            is_estimate BOOLEAN DEFAULT TRUE,
+            latitude NUMERIC,
+            longitude NUMERIC,
+            location_name TEXT,
+            image_url TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )`);
+          await runQuery(`ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        } catch {}
+
+        const url = new URL(request.url);
+        const isAll = url.searchParams.get('all') === 'true';
+        const reqLimit = parseInt(url.searchParams.get('limit') || '15', 10);
+        const limitVal = isAll ? 100 : (isNaN(reqLimit) ? 15 : Math.min(reqLimit, 100));
+
         let result;
         try {
-          result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, image_url, created_at FROM scan_history ORDER BY created_at DESC LIMIT 10`);
+          result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, image_url, created_at FROM scan_history ORDER BY created_at DESC LIMIT $1`, [limitVal]);
         } catch {
-          result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, created_at FROM scan_history ORDER BY created_at DESC LIMIT 10`);
+          result = await runQuery(`SELECT id, product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note, is_estimate, latitude, longitude, location_name, created_at FROM scan_history ORDER BY created_at DESC LIMIT $1`, [limitVal]);
         }
         const rows = result?.rows || [];
         const dbIds = new Set(rows.map(r => String(r.id)));
@@ -71,6 +106,32 @@ export function createHistoryPostHandler({ authenticate = verifyToken, query: ru
       let savedItem;
       try {
         try {
+          await runQuery(`CREATE TABLE IF NOT EXISTS scan_history (
+            id SERIAL PRIMARY KEY,
+            product_name TEXT NOT NULL,
+            brand TEXT,
+            model TEXT,
+            price_jpy NUMERIC,
+            lowest_price_idr NUMERIC,
+            average_price_idr NUMERIC,
+            currency TEXT DEFAULT 'JPY',
+            marketplace TEXT,
+            marketplace_url TEXT,
+            tokopedia_url TEXT,
+            shopee_url TEXT,
+            confidence NUMERIC,
+            estimate_note TEXT,
+            is_estimate BOOLEAN DEFAULT TRUE,
+            latitude NUMERIC,
+            longitude NUMERIC,
+            location_name TEXT,
+            image_url TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          )`);
+          await runQuery(`ALTER TABLE scan_history ADD COLUMN IF NOT EXISTS image_url TEXT`);
+        } catch {}
+
+        try {
           const result = await runQuery(INSERT_WITH_IMAGE, valuesWithImage);
           savedItem = result.rows[0];
         } catch {
@@ -85,6 +146,7 @@ export function createHistoryPostHandler({ authenticate = verifyToken, query: ru
         };
       }
       inMemoryScanHistory.unshift(savedItem);
+      saveFallbackFile(inMemoryScanHistory);
       return NextResponse.json({ success: true, item: savedItem }, { status: 201 });
     } catch {
       return NextResponse.json({ error: 'Gagal menyimpan riwayat scan' }, { status: 500 });
