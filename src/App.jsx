@@ -649,25 +649,29 @@ export default function App() {
     }
 
     try {
-      if (navigator.mediaDevices?.getUserMedia) {
-        await navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => stream.getTracks().forEach(t => t.stop())).catch(() => {});
-      }
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = getRecognitionLanguage(sourceLanguage);
 
-      recognition.onstart = () => setIsListening(true);
+      recognition.onstart = () => {
+        setIsListening(true);
+        setChatError('');
+      };
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        updateChatInput(transcript);
+        const transcript = event.results[0]?.[0]?.transcript;
+        if (transcript) updateChatInput(transcript);
         setIsListening(false);
       };
       recognition.onerror = (event) => {
-        console.warn('Speech Error:', event.error);
+        console.warn('Speech Recognition error event:', event.error);
         setIsListening(false);
         if (event.error === 'not-allowed') {
-          alert('Izin mikrofon ditolak. Izinkan akses mic di address bar browser lalu coba lagi.');
+          setChatError('Izin mikrofon ditolak. Izinkan akses mic di address bar browser lalu coba lagi.');
+        } else if (event.error === 'no-speech') {
+          setChatError('Tidak ada suara terdeteksi. Silakan coba bicara lagi.');
+        } else if (event.error !== 'aborted') {
+          setChatError(`Audio error (${event.error}). Coba lagi.`);
         }
       };
       recognition.onend = () => setIsListening(false);
@@ -675,8 +679,9 @@ export default function App() {
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
-      console.error(err);
+      console.error('Speech Recognition Exception:', err);
       setIsListening(false);
+      setChatError('Gagal memulai perekaman suara. Periksa mikrofon browser.');
     }
   };
 

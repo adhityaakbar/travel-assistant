@@ -58,7 +58,21 @@ export function getLanguageLabel(code) {
 }
 
 export function getRecognitionLanguage(code) {
-  return code || 'id-ID';
+  const map = {
+    id: 'id-ID',
+    ja: 'ja-JP',
+    en: 'en-US',
+    zh: 'zh-CN',
+    ko: 'ko-KR',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    de: 'de-DE',
+    ru: 'ru-RU',
+    th: 'th-TH',
+    jv: 'jw-ID',
+    su: 'su-ID',
+  };
+  return map[code] || (code?.includes('-') ? code : 'id-ID');
 }
 
 export function isLatestTranslationRequest(requestId, latestRequestId) {
