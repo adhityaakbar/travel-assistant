@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isLatestTranslationRequest, isTranslationCurrent, toggleRecognition } from './chat.js';
+import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isLatestTranslationRequest, isTranslationCurrent, requestMicrophonePermission, toggleRecognition } from './chat.js';
 
 test('mic toggle keeps recognition active until onend', () => {
   const calls = [];
@@ -55,8 +55,8 @@ test('stale translation rejection cannot overwrite current error or loading', ()
 });
 
 test('language UI values follow selected language', () => {
-  assert.equal(getLanguageLabel('ja'), 'Jepang');
-  assert.equal(getLanguageLabel('id'), 'Indonesia');
+  assert.equal(getLanguageLabel('ja'), '🇯🇵 Bahasa Jepang');
+  assert.equal(getLanguageLabel('id'), '🇮🇩 Bahasa Indonesia');
   assert.equal(getRecognitionLanguage('ja'), 'ja-JP');
   assert.equal(getRecognitionLanguage('id'), 'id-ID');
 });
@@ -90,4 +90,44 @@ test('translation becomes stale when source or languages change', () => {
   assert.equal(isTranslationCurrent({ ...current, sourceText: 'Hai' }, current), false);
   assert.equal(isTranslationCurrent(current, { ...current, sourceLanguage: 'ja', targetLanguage: 'id' }), false);
   assert.equal(isTranslationCurrent({ ...current, translatedText: '' }, current), false);
+});
+
+test('requestMicrophonePermission releases tracks on success', async () => {
+  let stopped = false;
+  const mockGetUserMedia = async () => ({
+    getTracks: () => [{ stop: () => { stopped = true; } }]
+  });
+  const res = await requestMicrophonePermission({ getUserMedia: mockGetUserMedia });
+  assert.equal(res.ok, true);
+  assert.equal(res.error, '');
+  assert.equal(stopped, true);
+});
+
+test('requestMicrophonePermission provides actionable message when permission denied', async () => {
+  const mockGetUserMedia = async () => {
+    const err = new Error('Permission denied');
+    err.name = 'NotAllowedError';
+    throw err;
+  };
+  const res = await requestMicrophonePermission({ getUserMedia: mockGetUserMedia });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /Izin mikrofon ditolak/);
+  assert.match(res.error, /gembok/);
+});
+
+test('requestMicrophonePermission identifies missing hardware', async () => {
+  const mockGetUserMedia = async () => {
+    const err = new Error('No device');
+    err.name = 'NotFoundError';
+    throw err;
+  };
+  const res = await requestMicrophonePermission({ getUserMedia: mockGetUserMedia });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /tidak ditemukan/);
+});
+
+test('requestMicrophonePermission handles missing API gracefully', async () => {
+  const res = await requestMicrophonePermission({ getUserMedia: null });
+  assert.equal(res.ok, false);
+  assert.match(res.error, /tidak didukung/);
 });

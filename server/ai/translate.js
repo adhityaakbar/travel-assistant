@@ -52,7 +52,7 @@ export function normalizeTranslateResponse(content) {
 export async function translateText({ text, sourceLanguage, targetLanguage }) {
   const baseUrl = process.env.OPENAI_BASE_URL;
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL;
+  const model = process.env.OPENAI_TRANSLATE_MODEL || process.env.OPENAI_MODEL;
   if (!baseUrl || !apiKey || !model) throw new Error('Translation provider is not configured');
 
   const systemPrompt = `You are a professional travel translator. 

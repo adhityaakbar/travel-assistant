@@ -4,17 +4,24 @@ const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL;
 
-if (!connectionString) throw new Error('DATABASE_URL wajib diatur di .env');
+export const pool = connectionString
+  ? new Pool({
+      connectionString,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    })
+  : null;
 
-export const pool = new Pool({
-  connectionString,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
+if (pool) {
+  pool.on('error', (err) => {
+    console.error('Unexpected error on idle postgres client', err);
+  });
+}
 
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle postgres client', err);
-});
-
-export const query = (text, params) => pool.query(text, params);
+export const query = (text, params) => {
+  if (!pool) {
+    throw new Error('DATABASE_URL wajib diatur di .env');
+  }
+  return pool.query(text, params);
+};

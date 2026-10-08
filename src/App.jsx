@@ -29,7 +29,7 @@ import {
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
 import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots } from './spots.js';
-import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
+import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
 export default function App() {
@@ -90,12 +90,12 @@ export default function App() {
   const [chatHistoryLoading, setChatHistoryLoading] = useState(false);
   const [chatSaving, setChatSaving] = useState(false);
 
-  const DEFAULT_TOKYO_LOCATION = { lat: 35.6595, lng: 139.7004 }; // Shibuya Scramble, Tokyo
+  const DEFAULT_JAKSEL_LOCATION = { lat: -6.2615, lng: 106.8106 }; // Jakarta Selatan
 
   // Spot Kalcer State
-  const [userLocation, setUserLocation] = useState(DEFAULT_TOKYO_LOCATION);
+  const [userLocation, setUserLocation] = useState(DEFAULT_JAKSEL_LOCATION);
   const [locatingUser, setLocatingUser] = useState(false);
-  const [locationStatus, setLocationStatus] = useState('📍 Spot Tokyo (Rekomendasi)');
+  const [locationStatus, setLocationStatus] = useState('📍 Jakarta Selatan (GPS Terdekat)');
   const [spotFilter, setSpotFilter] = useState('all');
   const [spotsList, setSpotsList] = useState([]);
   const [loadingSpots, setLoadingSpots] = useState(false);
@@ -274,7 +274,7 @@ export default function App() {
       setTargetLanguage('ja');
     }
     if (activeTab === 'kalcer') {
-      const targetLoc = userLocation || DEFAULT_TOKYO_LOCATION;
+      const targetLoc = userLocation || DEFAULT_JAKSEL_LOCATION;
       loadSpots(targetLoc.lat, targetLoc.lng, spotFilter);
     }
   }, [activeTab]);
@@ -338,13 +338,11 @@ export default function App() {
     }
 
     // 3. Microphone
-    try {
-      if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getTracks().forEach(t => t.stop());
-      }
-    } catch {
-      // mic permission denied silently or prompt
+    const micRes = await requestMicrophonePermission();
+    if (micRes.ok) {
+      setChatError('');
+    } else {
+      setChatError(micRes.error);
     }
   };
 
@@ -559,31 +557,13 @@ export default function App() {
         loadSpots(latitude, longitude, spotFilter);
       },
       (err) => {
-        console.warn('GPS Error:', err.message);
-        // Fallback retry dengan enableHighAccuracy: false jika high accuracy timeout/gagal
-        if (err?.code === 3 || err?.code === 2) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const { latitude, longitude } = pos.coords;
-              setUserLocation({ lat: latitude, lng: longitude });
-              setLocationStatus(`📍 GPS: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-              setLocatingUser(false);
-              loadSpots(latitude, longitude, spotFilter);
-            },
-            (retryErr) => {
-              setLocationStatus(locationErrorMessage(retryErr));
-              setSpotsList([]);
-              setLocatingUser(false);
-            },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
-          );
-          return;
-        }
-        setLocationStatus(locationErrorMessage(err));
-        setSpotsList([]);
+        console.warn('GPS Error, fallback ke Jakarta Selatan:', err.message);
+        setUserLocation(DEFAULT_JAKSEL_LOCATION);
+        setLocationStatus(`📍 Jakarta Selatan: ${DEFAULT_JAKSEL_LOCATION.lat.toFixed(4)}, ${DEFAULT_JAKSEL_LOCATION.lng.toFixed(4)}`);
         setLocatingUser(false);
+        loadSpots(DEFAULT_JAKSEL_LOCATION.lat, DEFAULT_JAKSEL_LOCATION.lng, spotFilter);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   };
 
@@ -677,8 +657,8 @@ export default function App() {
       recognition.onerror = (event) => {
         console.warn('Speech Recognition error event:', event.error);
         setIsListening(false);
-        if (event.error === 'not-allowed') {
-          setChatError('Izin mikrofon ditolak. Izinkan akses mic di address bar browser lalu coba lagi.');
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setChatError('Izin mikrofon ditolak. Klik tombol 🔑 Permission di kanan atas atau izinkan mic pada address bar browser lalu coba lagi.');
         } else if (event.error === 'no-speech') {
           setChatError('Tidak ada suara terdeteksi. Silakan coba bicara lagi.');
         } else if (event.error !== 'aborted') {
@@ -774,7 +754,7 @@ export default function App() {
           {/* Version Tracking Footer */}
           <div className="pt-2 text-center border-t border-slate-100">
             <span className="text-[10px] font-mono text-slate-400">
-              Build Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.0.0-latest'}
+              Build Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.2.0'}
             </span>
           </div>
 
@@ -787,14 +767,14 @@ export default function App() {
   // RENDER: MAIN APPLICATION SHELL
   // ==========================================
   return (
-    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-100 flex items-center justify-center sm:py-6 sm:px-4">
-      <div className="w-full max-w-[430px] min-h-[100dvh] sm:min-h-[860px] sm:max-h-[880px] bg-slate-50 sm:border sm:border-slate-200 sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+    <div className="h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-100 flex items-center justify-center sm:py-6 sm:px-4 sm:h-auto sm:min-h-[100dvh]">
+      <div className="w-full max-w-[430px] h-[100dvh] sm:h-[860px] sm:max-h-[880px] bg-slate-50 sm:border sm:border-slate-200 sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
         
         {/* Hidden Canvas for Camera Snapshots */}
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Top Header */}
-        <header className="px-5 pt-4 pb-3 bg-white border-b border-slate-200/80 flex items-center justify-between z-20">
+        <header className="px-5 pt-4 pb-3 bg-white border-b border-slate-200/80 flex items-center justify-between z-20 shrink-0">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</span>
@@ -824,7 +804,7 @@ export default function App() {
         </header>
 
         {/* Content Viewport */}
-        <main className="flex-1 overflow-y-auto no-scrollbar p-4 pb-28">
+        <main className="flex-1 min-h-0 overflow-y-auto no-scrollbar p-4 pb-6">
           
           {/* ==================================================== */}
           {/* TAB 1: VALAS & CURRENCY CONVERTER */}
@@ -1230,7 +1210,26 @@ export default function App() {
                 <button onClick={translateMessage} disabled={chatLoading} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition disabled:opacity-60">
                   {chatLoading ? 'Menerjemahkan...' : `Terjemahkan (${getLanguageLabel(sourceLanguage)} → ${getLanguageLabel(targetLanguage)})`}
                 </button>
-                {chatError && <p role="alert" className="text-xs text-red-600 bg-red-50 p-2 rounded-lg">{chatError}</p>}
+                {chatError && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 flex flex-wrap items-center justify-between gap-2 text-xs text-red-700">
+                    <p role="alert" className="flex-1 font-medium">{chatError}</p>
+                    {(chatError.includes('mikrofon') || chatError.includes('mic') || chatError.includes('Audio error')) && (
+                      <button
+                        onClick={async () => {
+                          const micRes = await requestMicrophonePermission();
+                          if (micRes.ok) {
+                            setChatError('');
+                          } else {
+                            setChatError(micRes.error);
+                          }
+                        }}
+                        className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-800 text-[11px] font-bold rounded-lg transition whitespace-nowrap border border-red-300"
+                      >
+                        🔑 Minta Izin Mic
+                      </button>
+                    )}
+                  </div>
+                )}
                 
                 {translatedText && (
                   <div className="space-y-3 text-left pt-2 border-t border-slate-100 animate-in fade-in">
@@ -1375,15 +1374,18 @@ export default function App() {
               <div className="flex justify-between items-center">
                 <div>
                   <h1 className="text-xl font-bold font-heading text-slate-900">Spot Kalcer 📍</h1>
-                  <p className="text-xs text-slate-500">{locationStatus}</p>
                 </div>
                 <button
                   onClick={requestUserLocation}
                   disabled={locatingUser}
-                  className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200 flex items-center gap-1.5 shadow-2xs hover:bg-blue-100 transition"
+                  className={`px-3 py-1.5 text-xs font-bold rounded-full border flex items-center gap-1.5 shadow-2xs transition ${
+                    userLocation && !locatingUser
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                      : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                  }`}
                 >
-                  <Navigation size={12} className={locatingUser ? "animate-spin" : ""} />
-                  <span>{locatingUser ? 'Mencari...' : 'GPS Saya'}</span>
+                  <Navigation size={12} className={locatingUser ? "animate-spin" : (userLocation ? "text-emerald-500 animate-pulse" : "")} />
+                  <span>{locatingUser ? 'Mencari...' : 'GPS'}</span>
                 </button>
               </div>
 
@@ -1403,19 +1405,6 @@ export default function App() {
                   </button>
                 ))}
               </div>
-
-              {/* GPS Coordinates & Status Badge */}
-              {userLocation && (
-                <div className="bg-blue-50/80 border border-blue-200/80 rounded-xl p-3 flex items-center justify-between text-xs text-blue-900 shadow-2xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="font-bold">GPS Terdeteksi:</span>
-                  </div>
-                  <span className="font-mono bg-white px-2.5 py-1 rounded-lg border border-blue-200 text-[11px] font-semibold text-blue-700 shadow-2xs">
-                    {userLocation.lat.toFixed(5)}, {userLocation.lng.toFixed(5)}
-                  </span>
-                </div>
-              )}
 
               {/* Spot Cards */}
               <div className="space-y-3">
@@ -1447,6 +1436,18 @@ export default function App() {
                           </div>
                         </div>
                       </div>
+                      {s.reviews && s.reviews.length > 0 && (
+                        <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                            💬 Top 3 Komentar:
+                          </div>
+                          {s.reviews.slice(0, 3).map((rev, idx) => (
+                            <div key={idx} className="text-slate-600 text-[11px] leading-snug">
+                              <span className="font-semibold text-slate-800">{rev.author || 'Pengunjung'}:</span> "{rev.text}"
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <a 
                         href={s.mapsUrl}
                         target="_blank"
@@ -1466,10 +1467,10 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="absolute bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around px-2 z-30">
+        <nav className="sticky bottom-0 left-0 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around px-2 z-30 shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <button 
             onClick={() => setActiveTab('valas')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
               activeTab === 'valas' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
@@ -1479,7 +1480,7 @@ export default function App() {
           
           <button 
             onClick={() => setActiveTab('scanner')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
               activeTab === 'scanner' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
@@ -1489,7 +1490,7 @@ export default function App() {
 
           <button 
             onClick={() => setActiveTab('ngobrol')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
               activeTab === 'ngobrol' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >
@@ -1499,7 +1500,7 @@ export default function App() {
 
           <button 
             onClick={() => setActiveTab('kalcer')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition ${
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
               activeTab === 'kalcer' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
             }`}
           >

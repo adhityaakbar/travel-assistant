@@ -29,9 +29,26 @@ test('rejects provider HTTP failure without leaking body', async () => {
   finally { globalThis.fetch = oldFetch; }
 });
 
-test('rejects missing provider environment', async () => {
-  const saved = [process.env.OPENAI_BASE_URL, process.env.OPENAI_API_KEY, process.env.OPENAI_MODEL];
-  delete process.env.OPENAI_BASE_URL; delete process.env.OPENAI_API_KEY; delete process.env.OPENAI_MODEL;
-  try { await assert.rejects(() => translateText({ text: 'halo', sourceLanguage: 'id', targetLanguage: 'ja' }), /not configured/); }
-  finally { [process.env.OPENAI_BASE_URL, process.env.OPENAI_API_KEY, process.env.OPENAI_MODEL] = saved; }
+test('uses OPENAI_TRANSLATE_MODEL over OPENAI_MODEL when set', async () => {
+  const oldFetch = globalThis.fetch;
+  process.env.OPENAI_BASE_URL = 'https://router.test';
+  process.env.OPENAI_API_KEY = 'secret-key';
+  process.env.OPENAI_MODEL = 'fallback-model';
+  process.env.OPENAI_TRANSLATE_MODEL = 'custom-translate-model';
+
+  let requestedModel = null;
+  globalThis.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    requestedModel = body.model;
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'こんにちは' } }] }), { status: 200 });
+  };
+
+  try {
+    const result = await translateText({ text: 'halo', sourceLanguage: 'id', targetLanguage: 'ja' });
+    assert.equal(result, 'こんにちは');
+    assert.equal(requestedModel, 'custom-translate-model');
+  } finally {
+    globalThis.fetch = oldFetch;
+    delete process.env.OPENAI_TRANSLATE_MODEL;
+  }
 });

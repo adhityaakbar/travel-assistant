@@ -1,13 +1,15 @@
 {
   "name": "travel-assistant",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "pkill -f 'next dev' || true; rm -rf .next && npm run build && npm run dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test"
+    "test": "node --test",
+    "version:patch": "npm version patch --no-git-tag-version"
   },
   "dependencies": {
     "axios": "^1.7.9",

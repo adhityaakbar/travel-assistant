@@ -7,7 +7,7 @@ test('starts without fallback spots or coordinates', () => {
 });
 
 test('lists normalized categories', () => {
-  assert.deepEqual(SPOT_CATEGORIES.map(({ id }) => id), ['all', 'coffee', 'food', 'shopping', 'gadget']);
+  assert.deepEqual(SPOT_CATEGORIES.map(({ id }) => id), ['all', 'foto', 'food', 'shopping', 'gadget', 'coffee', 'attraction', 'hiburan']);
 });
 
 test('category reload requires acquired location', () => {
@@ -17,5 +17,5 @@ test('category reload requires acquired location', () => {
 
 test('permission and unavailable GPS errors are actionable', () => {
   assert.match(locationErrorMessage({ code: 1 }), /Izinkan lokasi/);
-  assert.match(locationErrorMessage({ code: 2 }), /Coba lagi/);
+  assert.match(locationErrorMessage({ code: 2 }), /coba lagi/i);
 });

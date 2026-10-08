@@ -53,7 +53,7 @@ export const QUICK_PHRASES = [
 ];
 
 export function getLanguageLabel(code) {
-  const found = SUPPORTED_LANGUAGES.find((l) => l.code === code);
+  const found = SUPPORTED_LANGUAGES.find((l) => l.code === code || l.code.split('-')[0] === code);
   return found ? `${found.flag} ${found.name}` : code;
 }
 
@@ -108,4 +108,25 @@ export function conversationPayload({ sourceText, sourceLanguage, translatedText
     translated_text: translatedText,
     target_language: targetLanguage,
   };
+}
+
+export async function requestMicrophonePermission({ getUserMedia } = {}) {
+  const getMedia = getUserMedia || (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices));
+  if (!getMedia) {
+    return { ok: false, error: 'Fitur mikrofon tidak didukung atau memerlukan koneksi HTTPS.' };
+  }
+  try {
+    const stream = await getMedia({ audio: true });
+    if (stream && typeof stream.getTracks === 'function') {
+      stream.getTracks().forEach((t) => t.stop?.());
+    }
+    return { ok: true, error: '' };
+  } catch (err) {
+    const message = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError'
+      ? 'Izin mikrofon ditolak. Izinkan akses mic di address bar browser (klik ikon gembok) lalu coba lagi.'
+      : err?.name === 'NotFoundError'
+        ? 'Mikrofon tidak ditemukan. Hubungkan perangkat audio / mic lalu coba lagi.'
+        : 'Gagal mengakses mikrofon. Pastikan izin mic aktif & tidak dipakai aplikasi lain.';
+    return { ok: false, error: message };
+  }
 }

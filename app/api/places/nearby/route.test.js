@@ -7,7 +7,10 @@ const baseSpots = [
   { id: 'near', name: 'Near coffee', category: 'coffee', lat: 35.001, lng: 139, rating: '4.0★' },
   { id: 'food', name: 'Food', category: 'eat', lat: 35.003, lng: 139, rating: '4.0★' },
   { id: 'shop', name: 'Shop', category: 'thrift', lat: 35.004, lng: 139, rating: '4.0★' },
-  { id: 'gadget', name: 'Gadget', category: 'attraction', lat: 35.005, lng: 139, rating: '4.0★' },
+  { id: 'gadget', name: 'Gadget', category: 'gadget', lat: 35.005, lng: 139, rating: '4.0★' },
+  { id: 'attr', name: 'Attraction', category: 'attraction', lat: 35.006, lng: 139, rating: '4.0★' },
+  { id: 'foto', name: 'Foto', category: 'foto', lat: 35.007, lng: 139, rating: '4.0★' },
+  { id: 'hiburan', name: 'Hiburan', category: 'hiburan', lat: 35.008, lng: 139, rating: '4.0★' },
 ];
 
 function request(query = '') {
@@ -15,7 +18,7 @@ function request(query = '') {
 }
 
 function handler(options = {}) {
-  return createNearbyHandler({ curatedSpots: baseSpots, apiKey: '', ...options });
+  return createNearbyHandler({ curatedSpots: baseSpots, apiKey: 'test-key', dbQuery: null, ...options });
 }
 
 test('requires both coordinates', async () => {
@@ -49,13 +52,19 @@ test('rejects non-finite and out-of-range coordinates', async () => {
 });
 
 test('normalizes supported and legacy categories', () => {
-  assert.deepEqual(['all', 'coffee', 'food', 'shopping', 'gadget'].map(normalizeCategory), ['all', 'coffee', 'food', 'shopping', 'gadget']);
-  assert.deepEqual(['kopi', 'eat', 'thrift', 'attraction'].map(normalizeCategory), ['coffee', 'food', 'shopping', 'gadget']);
+  assert.deepEqual(
+    ['all', 'foto', 'food', 'shopping', 'gadget', 'coffee', 'attraction', 'hiburan'].map(normalizeCategory),
+    ['all', 'foto', 'food', 'shopping', 'gadget', 'coffee', 'attraction', 'hiburan']
+  );
+  assert.deepEqual(
+    ['kopi', 'kafe', 'eat', 'makan', 'thrift', 'belanja', 'atraksi', 'photo', 'entertainment'].map(normalizeCategory),
+    ['coffee', 'coffee', 'food', 'food', 'shopping', 'shopping', 'attraction', 'foto', 'hiburan']
+  );
   assert.equal(normalizeCategory('unknown'), null);
 });
 
-test('filters all supported categories after normalization', async () => {
-  const expected = { all: 5, coffee: 2, food: 1, shopping: 1, gadget: 1 };
+test('filters all 7 supported categories after normalization', async () => {
+  const expected = { all: 8, coffee: 2, food: 1, shopping: 1, gadget: 1, attraction: 1, foto: 1, hiburan: 1 };
   for (const [category, count] of Object.entries(expected)) {
     const response = await handler()(request(`?lat=35&lng=139&category=${category}`));
     const body = await response.json();
@@ -73,10 +82,12 @@ test('sorts places nearest first', async () => {
   assert.ok(body.places[0].distKm < body.places[1].distKm);
 });
 
-test('provider empty result stays empty instead of fabricating fallback', async () => {
-  const response = await handler({ apiKey: 'configured', searchPlaces: async () => [] })(request('?lat=35&lng=139&category=all'));
+test('provider empty result completes up to 20 spots from curated spots', async () => {
+  const response = await handler({ apiKey: 'test-key', searchPlaces: async () => [] })(request('?lat=35&lng=139&category=all'));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { location: { lat: 35, lng: 139 }, category: 'all', count: 0, places: [], source: 'provider', providerStatus: 'empty' });
+  const body = await response.json();
+  assert.equal(body.source, 'curated');
+  assert.ok(body.places.length > 0);
 });
 
 test('provider failure falls back gracefully to curated spots', async () => {

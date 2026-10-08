@@ -1,17 +1,11 @@
-import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
 
-const gitCommitHash = (() => {
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
-  } catch {
-    return 'dev';
-  }
-})();
+const appVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url))).version;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    NEXT_PUBLIC_APP_VERSION: `v1.0.0-${gitCommitHash}`,
+    NEXT_PUBLIC_APP_VERSION: `v${appVersion}`,
   },
 };
 
