@@ -1433,6 +1433,9 @@ export default function App() {
                           <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{s.desc}</div>
                           <div className="flex items-center gap-2 mt-2">
                             <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100">{s.rating}</span>
+                            {s.userRatingCount > 0 && (
+                              <span className="text-[11px] text-slate-500 font-medium">({s.userRatingCount.toLocaleString('id-ID')} ulasan)</span>
+                            )}
                             <span className="text-xs font-medium text-slate-400">📍 {s.dist}</span>
                           </div>
                         </div>

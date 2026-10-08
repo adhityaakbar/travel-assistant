@@ -41,6 +41,12 @@ function providerSpot(place, category, lat, lng, index) {
   const pLng = place.location?.longitude;
   if (!validCoordinates(pLat, pLng)) return null;
   const distKm = distance(lat, lng, pLat, pLng);
+  const ratingNum = Number(place.rating || 4.5);
+  const userRatingCount = Number(place.userRatingCount || 0);
+
+  // Popularity Score: rating * log10(userRatingCount + 10) / (distKm + 1)^0.3
+  const popularityScore = (ratingNum * Math.log10(userRatingCount + 10)) / Math.pow(distKm + 1, 0.3);
+
   return {
     id: place.id || `g-spot-${index}`,
     name: place.displayName?.text || 'Google Place',
@@ -48,11 +54,13 @@ function providerSpot(place, category, lat, lng, index) {
     category,
     lat: pLat,
     lng: pLng,
-    rating: `${(place.rating || 4.8).toFixed(1)}★`,
+    rating: `${ratingNum.toFixed(1)}★`,
+    userRatingCount,
+    popularityScore,
     dist: formatDistance(distKm),
     distKm,
     icon: place.types?.includes('cafe') ? '☕' : place.types?.includes('restaurant') ? '🍜' : place.types?.includes('electronics_store') ? '🎧' : '📍',
-    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.displayName?.text || 'Google Place')}&query_place_id=${place.id || ''}`,
+    mapsUrl: place.googleMapsUri || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.displayName?.text || 'Google Place')}&query_place_id=${place.id || ''}`,
   };
 }
 
@@ -76,10 +84,14 @@ export function createNearbyHandler({ curatedSpots = CURATED_SPOTS, apiKey = pro
           const result = await axios.post('https://places.googleapis.com/v1/places:searchNearby', {
             includedTypes: CATEGORY_TYPES[category], maxResultCount: 20,
             locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: 3000 } },
-          }, { timeout: 8000, headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.shortFormattedAddress,places.types' } });
+          }, { timeout: 8000, headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.userRatingCount,places.googleMapsUri,places.shortFormattedAddress,places.types' } });
           return result.data?.places || [];
         }))();
-        const normalized = places.map((place, index) => providerSpot(place, category, lat, lng, index)).filter(Boolean).sort((a, b) => a.distKm - b.distKm).slice(0, 20);
+        const normalized = places
+          .map((place, index) => providerSpot(place, category, lat, lng, index))
+          .filter(Boolean)
+          .sort((a, b) => b.popularityScore - a.popularityScore)
+          .slice(0, 20);
         return NextResponse.json({ location: { lat, lng }, category, count: normalized.length, places: normalized, source: 'provider', ...(normalized.length ? {} : { providerStatus: 'empty' }) });
       } catch {
         return NextResponse.json({ error: 'Layanan tempat terdekat sedang bermasalah. Coba lagi.' }, { status: 502 });
