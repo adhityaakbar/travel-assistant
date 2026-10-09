@@ -117,6 +117,7 @@ export default function App() {
   const [scanHistoryList, setScanHistoryList] = useState([]);
   const [allScanHistoryList, setAllScanHistoryList] = useState([]);
   const [showAllScanHistoryModal, setShowAllScanHistoryModal] = useState(false);
+  const [scanHistoryPage, setScanHistoryPage] = useState(1);
   const [copiedHistoryId, setCopiedHistoryId] = useState(null);
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
@@ -697,6 +698,7 @@ export default function App() {
       });
       if (res.data && res.data.history) {
         setAllScanHistoryList(res.data.history);
+        setScanHistoryPage(1);
         setShowAllScanHistoryModal(true);
       }
     } catch (err) {
@@ -2406,7 +2408,9 @@ export default function App() {
                     <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between bg-slate-50/50 dark:bg-white/5">
                       <div>
                         <h3 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Semua Riwayat Scan Tersimpan</h3>
-                        <p className="text-[11px] text-[#5A6E85] dark:text-slate-400">Daftar lengkap hasil scan harga & estimasi lokasi</p>
+                        <p className="text-[11px] text-[#5A6E85] dark:text-slate-400">
+                          Daftar lengkap hasil scan ({allScanHistoryList.length} item)
+                        </p>
                       </div>
                       <button 
                         onClick={() => setShowAllScanHistoryModal(false)}
@@ -2420,7 +2424,9 @@ export default function App() {
                       {allScanHistoryList.length === 0 ? (
                         <div className="text-center py-8 text-xs text-[#5A6E85] dark:text-slate-400">Belum ada riwayat scan tersimpan.</div>
                       ) : (
-                        allScanHistoryList.map((item, idx) => (
+                        allScanHistoryList
+                          .slice((scanHistoryPage - 1) * 10, scanHistoryPage * 10)
+                          .map((item, idx) => (
                           <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
                             {item.image_url ? (
                               <img 
@@ -2504,7 +2510,30 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 flex justify-end">
+                    <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 flex items-center justify-between">
+                      {Math.ceil(allScanHistoryList.length / 10) > 1 ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            disabled={scanHistoryPage === 1}
+                            onClick={() => setScanHistoryPage(prev => Math.max(prev - 1, 1))}
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60 dark:bg-white/10 text-[#0A1937] dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 dark:hover:bg-white/20 transition cursor-pointer"
+                          >
+                            ← Prev
+                          </button>
+                          <span className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium">
+                            {scanHistoryPage} / {Math.ceil(allScanHistoryList.length / 10)}
+                          </span>
+                          <button
+                            disabled={scanHistoryPage >= Math.ceil(allScanHistoryList.length / 10)}
+                            onClick={() => setScanHistoryPage(prev => Math.min(prev + 1, Math.ceil(allScanHistoryList.length / 10)))}
+                            className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60 dark:bg-white/10 text-[#0A1937] dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 dark:hover:bg-white/20 transition cursor-pointer"
+                          >
+                            Next →
+                          </button>
+                        </div>
+                      ) : (
+                        <div />
+                      )}
                       <button
                         onClick={() => setShowAllScanHistoryModal(false)}
                         className="px-4 py-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-[#0A1937] dark:text-white text-xs font-bold rounded-xl transition cursor-pointer"
