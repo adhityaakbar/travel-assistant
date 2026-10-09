@@ -37,13 +37,21 @@
   - Inactive Chip: `bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white`.
 - **Kartu Frasa:** Teks romaji merah (`text-red-600 dark:text-red-400`), tombol `🔊 Audio` dan `📋 Salin`.
 
-### 📷 Layar 3: Cek Harga AI Scanner (Kamera Ready & Riwayat Result)
+### 📷 Layar 3: Cek Harga AI Scanner & Kartu Riwayat Item
 - **Viewfinder Reticle Frame:** `border-2 border-dashed border-red-500/40 rounded-2xl bg-white dark:bg-[#0A1937]/80`.
-- **Kartu Riwayat Scan (Product Result Card):**
-  - Thumbnail gambar produk dengan border subtil.
-  - Tombol Salin Nama Produk (`copy` icon) di samping judul produk.
-  - Harga Asal vs Estimasi IDR (`text-emerald-600 dark:text-emerald-400 font-extrabold`).
-  - Badge Negara (`🇯🇵 Tokyo, JP`) & Link Komparasi Tokopedia (`text-red-600 dark:text-red-400 font-bold`).
+- **Header Riwayat Scan:** Teks judul `Riwayat Scan Tersimpan` (`text-[#0A1937] dark:text-white`) + Tombol `Tampilkan Semua` (`text-red-600 dark:text-red-400 font-bold`).
+- **Modal Breakdown Hasil Scan Visual AI (Komponen dari Screenshot `image_3e1d5e.png`):**
+  - **Wadah Modal:** `bg-white dark:bg-[#0A1937]/90 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3`
+  - **Badge Status AI Terverifikasi:** `bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-md text-xs font-bold`
+  - **Judul Produk & Copy Button:** Judul `text-[#0A1937] dark:text-white font-bold`, tombol Salin `bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-[#5A6E85] dark:text-slate-300`.
+  - **Tombol GPS Maps:** `bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 px-2.5 py-1 rounded-md font-semibold text-[11px]`.
+  - **Grid Card Estimasi Harga AI:** `bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 grid grid-cols-2 gap-2`.
+    - TERENDAH INDONESIA: `text-emerald-600 dark:text-emerald-400 font-extrabold`.
+    - HARGA JEPANG & RATA-RATA INDONESIA: `text-[#0A1937] dark:text-white font-extrabold`.
+  - **Tombol Marketplace & Simpan:**
+    - Tokopedia: `bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold`.
+    - Shopee: `bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold`.
+    - **Simpan Ke Server:** `bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-xl text-xs font-bold shadow-xs hover:opacity-95`.
 
 ### 📍 Layar 4: Spot Kalcer (Rekomendasi Tempat & Ulasan Komunitas)
 - **GPS Status Badge:** `bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20`.

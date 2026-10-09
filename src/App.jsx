@@ -1540,46 +1540,46 @@ export default function App() {
                       }
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded-md font-semibold transition"
+                      className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1 rounded-md font-semibold transition cursor-pointer"
                       title="Buka Lokasi Scan di Google Maps"
                     >
-                      <MapPin size={12} className="text-blue-600" />
+                      <MapPin size={12} className="text-red-600 dark:text-red-400" />
                       <span>📍 Buka GPS di Maps ↗</span>
                     </a>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200/60">
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
                     <div>
-                      <div className="text-[11px] font-semibold text-slate-500">TERENDAH INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-emerald-600 mt-0.5">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
                         {scannedResult.lowest_price_idr != null ? `Rp ${Number(scannedResult.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-[11px] font-semibold text-slate-500">HARGA JEPANG · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-slate-900 mt-0.5">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">HARGA JEPANG · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white mt-0.5">
                         {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
                       </div>
                     </div>
-                    <div className="col-span-2 pt-2 border-t border-slate-200">
-                      <div className="text-[11px] font-semibold text-slate-500">RATA-RATA INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-bold text-slate-800">
+                    <div className="col-span-2 pt-2 border-t border-slate-200/80 dark:border-white/10">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">RATA-RATA INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-bold text-[#0A1937] dark:text-slate-200">
                         {scannedResult.average_price_idr != null ? `Rp ${Number(scannedResult.average_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
                       </div>
                     </div>
                   </div>
 
-                  {scannedResult.estimate_note && <p className="text-xs text-slate-500">{scannedResult.estimate_note}</p>}
+                  {scannedResult.estimate_note && <p className="text-xs text-[#5A6E85] dark:text-slate-400">{scannedResult.estimate_note}</p>}
 
                   {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
                     <div className="grid grid-cols-2 gap-2">
                       {scannedResult.tokopedia_url && (
-                        <a href={scannedResult.tokopedia_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-green-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+                        <a href={scannedResult.tokopedia_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs">
                           Tokopedia <ExternalLink size={14} aria-hidden="true" />
                         </a>
                       )}
                       {scannedResult.shopee_url && (
-                        <a href={scannedResult.shopee_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-orange-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+                        <a href={scannedResult.shopee_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs">
                           Shopee <ExternalLink size={14} aria-hidden="true" />
                         </a>
                       )}
@@ -1589,10 +1589,10 @@ export default function App() {
                   <button
                     onClick={saveScannedResultToHistory}
                     disabled={scannedResultSaved || scanSaving}
-                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-xs ${
+                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                       scannedResultSaved
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 cursor-default'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-md active:scale-98'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
+                        : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
                     }`}
                   >
                     {scanSaving ? (
@@ -2334,16 +2334,16 @@ export default function App() {
               )}
               {/* Modal All Saved History */}
               {showAllHistoryModal && (
-                <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col shadow-xl animate-in zoom-in-95">
-                    <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white dark:bg-[#001A41] rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200/80 dark:border-white/10 animate-in zoom-in-95">
+                    <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
                       <div>
-                        <h3 className="text-base font-bold text-slate-900">Semua Percakapan Tersimpan</h3>
-                        <p className="text-xs text-slate-500">Klik kartu untuk memuat pesan ke chat box</p>
+                        <h3 className="text-base font-bold text-[#0A1937] dark:text-white">Semua Percakapan Tersimpan</h3>
+                        <p className="text-xs text-[#5A6E85] dark:text-slate-400">Klik kartu untuk memuat pesan ke chat box</p>
                       </div>
                       <button 
                         onClick={() => setShowAllHistoryModal(false)}
-                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 font-bold text-sm"
+                        className="p-1 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-lg text-[#5A6E85] dark:text-slate-300 font-bold text-sm cursor-pointer transition"
                       >
                         ✕
                       </button>
@@ -2353,39 +2353,39 @@ export default function App() {
                       {chatHistory.map((item) => (
                         <div 
                           key={item.id} 
-                          className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-blue-300 transition space-y-2 relative"
+                          className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition space-y-2 relative"
                         >
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               deleteChat(item.id);
                             }}
-                            className="absolute top-2.5 left-2.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10"
+                            className="absolute top-2.5 left-2.5 w-5 h-5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
                             title="Hapus percakapan tersimpan"
                           >
                             ✕
                           </button>
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium pl-6">
+                          <div className="flex justify-between items-center text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium pl-6">
                             <span>{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
                             <button 
                               onClick={() => playAudio(item.translated_text, item.target_language, `modal-${item.id}`)}
-                              className="text-blue-600 hover:bg-blue-50 p-1.5 rounded flex items-center gap-1 font-semibold text-xs"
+                              className="text-red-600 dark:text-red-400 hover:bg-red-500/10 p-1.5 rounded flex items-center gap-1 font-semibold text-xs cursor-pointer transition"
                             >
-                              <Volume2 size={13} className={playingAudioId === `modal-${item.id}` ? 'animate-bounce text-blue-600' : ''} /> Play
+                              <Volume2 size={13} className={playingAudioId === `modal-${item.id}` ? 'animate-bounce text-red-600' : ''} /> Play
                             </button>
                           </div>
                           <div className="cursor-pointer space-y-1" onClick={() => { loadItemToChat(item); setShowAllHistoryModal(false); }}>
-                            <div className="text-xs font-semibold text-slate-800 line-clamp-2">{item.source_text}</div>
-                            <div className="text-xs text-blue-950 font-medium whitespace-pre-line bg-slate-50 p-2 rounded-lg">{item.translated_text}</div>
+                            <div className="text-xs font-semibold text-[#0A1937] dark:text-white line-clamp-2">{item.source_text}</div>
+                            <div className="text-xs text-red-600 dark:text-red-400 font-medium whitespace-pre-line bg-slate-50 dark:bg-white/5 p-2 rounded-lg border border-slate-100 dark:border-white/5">{item.translated_text}</div>
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end">
+                    <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-white/5 flex justify-end">
                       <button
                         onClick={() => setShowAllHistoryModal(false)}
-                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition"
+                        className="px-4 py-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-[#0A1937] dark:text-white text-xs font-bold rounded-xl transition cursor-pointer"
                       >
                         Tutup
                       </button>

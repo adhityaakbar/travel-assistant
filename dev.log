@@ -1,5 +1,5 @@
 
-> travel-assistant@1.4.6 dev:https
+> travel-assistant@1.5.0 dev:https
 > next dev -H 0.0.0.0 --experimental-https --experimental-https-key ./certificates/key.pem --experimental-https-cert ./certificates/cert.pem -p 3000
 
  ⚠ Self-signed certificates are currently an experimental feature, use with caution.
@@ -9,29 +9,4 @@
   - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 1066ms
- ○ Compiling / ...
- ✓ Compiled / in 2s (760 modules)
- GET / 200 in 2252ms
- ✓ Compiled /api/valas/rates in 464ms (525 modules)
- ✓ Compiled (667 modules)
- GET /api/auth/me 200 in 787ms
- GET /api/valas/history 200 in 830ms
- GET /api/chat/history 200 in 830ms
- GET /api/scanner/history?limit=15 200 in 953ms
- GET /api/valas/rates 200 in 1270ms
- ✓ Compiled /api/places/nearby in 198ms (670 modules)
-Google Places API Error/Timeout: {
-  error: {
-    code: 403,
-    message: 'Requests to this API places.googleapis.com method google.maps.places.v1.Places.SearchNearby are blocked.',
-    status: 'PERMISSION_DENIED',
-    details: [ [Object], [Object] ]
-  }
-}
- GET /api/places/nearby?lat=-6.584266663276738&lng=106.88122479988705&category=all 200 in 516ms
- GET /api/places/nearby?lat=-6.24534870113485&lng=106.85229947346637&category=all 200 in 54ms
- GET /api/scanner/history?limit=15 200 in 125ms
- ✓ Compiled in 188ms (659 modules)
- ✓ Compiled in 2.4s (760 modules)
- ✓ Compiled in 503ms (760 modules)
+ ✓ Ready in 1015ms
