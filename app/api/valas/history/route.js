@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { NextResponse } from 'next/server.js';
 import { query as defaultQuery } from '../../../../server/db.js';
 import { CURRENCIES } from '../../../../src/valas.js';
@@ -5,6 +7,35 @@ import { verifyToken } from '../../../../server/auth.js';
 
 const SUPPORTED_CURRENCIES = new Set([...CURRENCIES, 'IDR']);
 const numericError = 'Nilai numerik harus berupa angka finite non-negatif';
+
+const isTest = typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || process.argv.some(a => a.includes('test')));
+const fallbackFile = path.join(process.cwd(), 'data', 'valas_history_fallback.json');
+
+function loadFallbackFile() {
+  if (isTest) return [];
+  try {
+    if (fs.existsSync(fallbackFile)) {
+      const data = fs.readFileSync(fallbackFile, 'utf-8');
+      return JSON.parse(data) || [];
+    }
+  } catch (err) {
+    console.warn('Gagal membaca fallback file valas:', err?.message);
+  }
+  return [];
+}
+
+function saveFallbackFile(list) {
+  if (isTest) return;
+  try {
+    const dir = path.dirname(fallbackFile);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(fallbackFile, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Gagal menyimpan fallback file valas:', err?.message);
+  }
+}
+
+export let inMemoryValasHistory = loadFallbackFile();
 
 function error(message, status) { return NextResponse.json({ error: message }, { status }); }
 
@@ -29,7 +60,9 @@ export function createCollectionHandler({ query = defaultQuery, authenticate = v
       try {
         const result = await query('SELECT id, from_currency, to_currency, from_amount, to_amount, exchange_rate, note, created_at FROM conversions ORDER BY created_at DESC LIMIT 10');
         return NextResponse.json({ history: result.rows });
-      } catch { return error('Gagal memuat riwayat', 500); }
+      } catch {
+        return NextResponse.json({ history: inMemoryValasHistory });
+      }
     },
     async POST(request) {
       if (!isOwner(requireAuth(request))) return error('Autentikasi diperlukan', 401);
@@ -43,7 +76,24 @@ export function createCollectionHandler({ query = defaultQuery, authenticate = v
       try {
         const result = await query('INSERT INTO conversions (from_currency, to_currency, from_amount, to_amount, exchange_rate, note) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *', [from_currency, to_currency, payload.from_amount, payload.to_amount, payload.exchange_rate, payload.note ?? '']);
         return NextResponse.json({ success: true, item: result.rows[0] }, { status: 201 });
-      } catch { return error('Gagal menyimpan riwayat', 500); }
+      } catch (err) {
+        if (err?.message === 'DATABASE_URL wajib diatur di .env') {
+          const savedItem = {
+            id: Date.now(),
+            from_currency,
+            to_currency,
+            from_amount: payload.from_amount,
+            to_amount: payload.to_amount,
+            exchange_rate: payload.exchange_rate,
+            note: payload.note ?? '',
+            created_at: new Date().toISOString()
+          };
+          inMemoryValasHistory.unshift(savedItem);
+          saveFallbackFile(inMemoryValasHistory);
+          return NextResponse.json({ success: true, item: savedItem }, { status: 201 });
+        }
+        return error('Gagal menyimpan riwayat', 500);
+      }
     },
   };
 }

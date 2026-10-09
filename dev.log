@@ -1,5 +1,5 @@
 
-> travel-assistant@1.4.3 dev:https
+> travel-assistant@1.4.6 dev:https
 > next dev -H 0.0.0.0 --experimental-https --experimental-https-key ./certificates/key.pem --experimental-https-cert ./certificates/cert.pem -p 3000
 
  ⚠ Self-signed certificates are currently an experimental feature, use with caution.
@@ -9,86 +9,29 @@
   - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 904ms
+ ✓ Ready in 1066ms
  ○ Compiling / ...
- ✓ Compiled / in 1296ms (750 modules)
- GET / 200 in 1401ms
- ⚠ Cross origin request detected from 192.168.100.179 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
-Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
- ✓ Compiled /api/valas/rates in 309ms (520 modules)
- ✓ Compiled (660 modules)
- GET /api/auth/me 200 in 574ms
- GET /api/valas/history 200 in 609ms
- GET /api/chat/history 200 in 609ms
- GET /api/scanner/history?limit=15 200 in 622ms
- GET /api/valas/rates 200 in 1011ms
- GET /api/chat/history 200 in 18ms
- GET / 200 in 68ms
- GET /api/auth/me 200 in 6ms
- GET /api/valas/rates 200 in 11ms
- GET /api/valas/history 200 in 17ms
- GET /api/chat/history 200 in 45ms
- GET /api/scanner/history?limit=15 200 in 66ms
- ✓ Compiled /_not-found in 342ms (1001 modules)
- GET /_next/static/webpack/4985b68f0e4f2374.webpack.hot-update.json 404 in 370ms
- GET / 200 in 18ms
- GET / 200 in 11ms
- GET /api/auth/me 200 in 24ms
- GET /api/chat/history 200 in 165ms
- GET /api/valas/history 200 in 167ms
- GET /api/scanner/history?limit=15 200 in 186ms
- GET /api/valas/rates 200 in 495ms
- ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
-Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
- GET /api/auth/me 200 in 23ms
- GET /api/valas/rates 200 in 26ms
- GET /api/valas/history 200 in 32ms
- GET /api/chat/history 200 in 62ms
- GET /api/scanner/history?limit=15 200 in 83ms
- GET /api/chat/history 200 in 180ms
- GET /api/scanner/history?limit=15 200 in 80ms
- ✓ Compiled /api/places/nearby in 207ms (664 modules)
- GET /api/places/nearby?lat=-6.245389725319204&lng=106.85226666444423&category=all 200 in 350ms
- GET /api/places/nearby?lat=-6.245389725319204&lng=106.85226666444423&category=shopping 200 in 49ms
- ✓ Compiled in 585ms (1004 modules)
- GET /api/auth/me 200 in 24ms
- GET /api/places/nearby?lat=-6.245389725319204&lng=106.85226666444423&category=food 200 in 276ms
- GET /api/auth/me 200 in 21ms
- GET /api/valas/history 200 in 35ms
- GET /api/chat/history 200 in 71ms
- GET /api/valas/history 200 in 60ms
- GET /api/scanner/history?limit=15 200 in 35ms
- GET /api/scanner/history?limit=15 200 in 89ms
- GET /api/chat/history 200 in 48ms
- GET / 200 in 34ms
- GET /api/valas/rates 200 in 470ms
- GET /api/valas/rates 200 in 448ms
- GET /api/valas/rates 200 in 9ms
- GET /api/valas/rates 200 in 3ms
- ✓ Compiled in 369ms (1001 modules)
- GET /api/auth/me 200 in 8ms
- GET /api/valas/history 200 in 48ms
- GET /api/chat/history 200 in 35ms
- GET /api/scanner/history?limit=15 200 in 56ms
- GET / 200 in 29ms
- GET /api/valas/rates 200 in 427ms
- GET /api/valas/rates 200 in 392ms
- GET /api/valas/rates 200 in 4ms
- ✓ Compiled in 405ms (1001 modules)
- GET / 200 in 29ms
- GET /api/valas/rates 200 in 393ms
- ✓ Compiled in 121ms (663 modules)
- GET / 200 in 257ms
- GET /api/valas/rates 200 in 248ms
- ✓ Compiled in 319ms (1001 modules)
- GET / 200 in 32ms
- GET /api/valas/rates 200 in 384ms
- ✓ Compiled /_not-found in 202ms (990 modules)
- GET /_next/static/webpack/feb3a0d27e889abb.webpack.hot-update.json 404 in 128ms
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- GET / 200 in 2ms
- GET / 200 in 10ms
- GET /_next/static/css/app/layout.css?v=1791506889497 404 in 11ms
- GET /_next/static/chunks/main-app.js?v=1791506889497 404 in 18ms
- GET /_next/static/chunks/app-pages-internals.js 404 in 18ms
- GET /_next/static/chunks/app/page.js 404 in 17ms
+ ✓ Compiled / in 2s (760 modules)
+ GET / 200 in 2252ms
+ ✓ Compiled /api/valas/rates in 464ms (525 modules)
+ ✓ Compiled (667 modules)
+ GET /api/auth/me 200 in 787ms
+ GET /api/valas/history 200 in 830ms
+ GET /api/chat/history 200 in 830ms
+ GET /api/scanner/history?limit=15 200 in 953ms
+ GET /api/valas/rates 200 in 1270ms
+ ✓ Compiled /api/places/nearby in 198ms (670 modules)
+Google Places API Error/Timeout: {
+  error: {
+    code: 403,
+    message: 'Requests to this API places.googleapis.com method google.maps.places.v1.Places.SearchNearby are blocked.',
+    status: 'PERMISSION_DENIED',
+    details: [ [Object], [Object] ]
+  }
+}
+ GET /api/places/nearby?lat=-6.584266663276738&lng=106.88122479988705&category=all 200 in 516ms
+ GET /api/places/nearby?lat=-6.24534870113485&lng=106.85229947346637&category=all 200 in 54ms
+ GET /api/scanner/history?limit=15 200 in 125ms
+ ✓ Compiled in 188ms (659 modules)
+ ✓ Compiled in 2.4s (760 modules)
+ ✓ Compiled in 503ms (760 modules)

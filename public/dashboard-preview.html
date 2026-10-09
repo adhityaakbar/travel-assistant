@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Sub-Pages & Tabs Skin (THE v2.0) - Travel Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-outer: #F4F6FB;
+      --shell-bg: #FFFFFF;
+      --header-bg: rgba(255, 255, 255, 0.9);
+      --card-bg: #F8FAFC;
+      --card-border: rgba(0, 26, 65, 0.08);
+      --text-main: #0A1937;
+      --text-sub: #5A6E85;
+      --glow-1: rgba(255, 0, 37, 0.08);
+      --glow-2: rgba(253, 162, 43, 0.08);
+    }
+
+    .dark {
+      --bg-outer: #000E26;
+      --shell-bg: #001A41;
+      --header-bg: rgba(0, 26, 65, 0.9);
+      --card-bg: rgba(10, 25, 55, 0.85);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #FFFFFF;
+      --text-sub: #94A3B8;
+      --glow-1: rgba(255, 0, 37, 0.18);
+      --glow-2: rgba(0, 0, 149, 0.25);
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-outer);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .tsel-aurora-bg {
+      background: 
+        radial-gradient(circle at 50% 10%, var(--glow-1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 90%, var(--glow-2) 0%, transparent 50%),
+        var(--bg-outer);
+    }
+
+    .tsel-shell {
+      background: var(--shell-bg);
+      border-color: var(--card-border);
+      transition: all 0.3s ease;
+    }
+
+    .tsel-header {
+      background: var(--header-bg);
+      border-color: var(--card-border);
+    }
+
+    .tsel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+    }
+
+    .tsel-btn-primary {
+      background: linear-gradient(135deg, #FF0025 0%, #FDA22B 100%);
+      transition: all 0.2s ease;
+    }
+
+    .tsel-chip-active {
+      background: linear-gradient(135deg, #FF0025 0%, #FDA22B 100%);
+      color: #FFFFFF;
+      border-color: transparent;
+    }
+  </style>
+</head>
+<body id="appBody" class="tsel-aurora-bg min-h-screen flex items-center justify-center p-0 sm:p-4 relative">
+
+  <!-- Floating Theme Switcher Badge -->
+  <div class="fixed top-3 right-3 z-50 flex items-center gap-1 p-1 rounded-full bg-white/90 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 backdrop-blur-md shadow-md">
+    <button onclick="setTheme('light')" id="lightBtn" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition bg-red-500 text-white shadow-xs">
+      ☀️ Light
+    </button>
+    <button onclick="setTheme('dark')" id="darkBtn" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition text-slate-500 dark:text-slate-400 hover:text-slate-900">
+      🌙 Dark
+    </button>
+  </div>
+
+  <!-- Mobile App Shell Mockup -->
+  <div class="w-full max-w-[430px] h-[100dvh] sm:h-[840px] sm:max-h-[860px] tsel-shell sm:border sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+
+    <!-- Top Header -->
+    <header class="px-4 pt-3.5 pb-2.5 tsel-header backdrop-blur-md border-b flex items-center justify-between z-20 shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-xs">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <rect width="16" height="13" x="4" y="7" rx="2"></rect>
+            <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"></path>
+            <path d="M9 11v5"></path>
+            <path d="M15 11v5"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-base font-extrabold text-[var(--text-main)] tracking-tight">Travel Assistant</span>
+            <span class="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 rounded-full border border-red-500/20">JP</span>
+          </div>
+          <div class="text-[10px] text-[var(--text-sub)] font-mono -mt-0.5">v1.4.6</div>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-1.5">
+        <button class="w-8 h-8 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400">
+          📱
+        </button>
+        <button class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 flex items-center justify-center text-[var(--text-sub)]">
+          🚪
+        </button>
+      </div>
+    </header>
+
+    <!-- Scrollable Content Viewport -->
+    <main class="flex-1 min-h-0 overflow-y-auto no-scrollbar p-3.5">
+
+      <!-- SUB-PAGE 1: NGOBROL - CHAT AI & KAMUS FRASA (From Gambar 1 & 2) -->
+      <div id="view-ngobrol" class="space-y-3.5">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-lg font-bold text-[var(--text-main)]">Ngobrol & Frasa 💬</h1>
+            <p class="text-[11px] text-[var(--text-sub)]">Terjemahan Suara & Kamus Frasa Cepat</p>
+          </div>
+          <span class="px-2.5 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[11px] font-bold rounded-full border border-amber-500/20">VOICE</span>
+        </div>
+
+        <!-- Sub-tab Switcher: Chat AI vs Frasa Cepat -->
+        <div class="flex p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
+          <button onclick="setNgobrolMode('chat')" id="btn-mode-chat" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 shadow-2xs">
+            💬 Chat AI
+          </button>
+          <button onclick="setNgobrolMode('frasa')" id="btn-mode-frasa" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-[var(--text-sub)]">
+            📖 Frasa Cepat
+          </button>
+        </div>
+
+        <!-- Mode A: Chat AI Stream View -->
+        <div id="ngobrol-chat-view" class="space-y-3">
+          <div class="tsel-card rounded-2xl p-3 space-y-2.5">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-xs font-bold text-red-600 dark:text-red-400">
+              <span>🇮🇩 Bahasa Indonesia</span>
+              <span>⇄</span>
+              <span>🇯🇵 Bahasa Jepang</span>
+            </div>
+
+            <textarea rows="2" placeholder="Ketik kalimat atau tekan mic..." class="w-full p-2.5 text-xs rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/50 text-[var(--text-main)] outline-none resize-none"></textarea>
+
+            <div class="flex items-center justify-between gap-2">
+              <button class="px-3 py-2 rounded-xl bg-red-500 text-white text-xs font-bold flex items-center gap-1 animate-pulse">
+                🎙️ <span>Mendengarkan...</span>
+              </button>
+              <button class="px-4 py-2 tsel-btn-primary text-white text-xs font-bold rounded-xl shadow-xs">
+                Kirim 🚀
+              </button>
+            </div>
+          </div>
+
+          <!-- Chat Stream Bubbles -->
+          <div class="space-y-2.5 pt-1">
+            <div class="flex flex-col items-end">
+              <div class="max-w-[85%] p-3 rounded-2xl rounded-tr-none bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white text-xs space-y-1 shadow-xs">
+                <div class="font-medium">Permisi, di mana stasiun kereta terdekat?</div>
+                <div class="text-[10px] text-white/80 font-mono">10:45 WIB</div>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-start">
+              <div class="max-w-[85%] p-3 rounded-2xl rounded-tl-none tsel-card text-[var(--text-main)] text-xs space-y-1.5 shadow-xs">
+                <div class="font-bold text-red-600 dark:text-red-400">🇯🇵 Terjemahan AI:</div>
+                <div class="text-sm font-bold">Sumimasen, ichiban chikai eki wa doko desu ka?</div>
+                <div class="text-xs text-[var(--text-sub)]">すみません、一番近い駅はどこですか？</div>
+                <div class="flex items-center gap-2 pt-1 border-t border-slate-200/60 dark:border-white/10">
+                  <button class="px-2 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-md flex items-center gap-1">
+                    🔊 Putar Suara
+                  </button>
+                  <button class="px-2 py-1 bg-slate-100 dark:bg-white/10 text-[var(--text-sub)] text-[10px] font-bold rounded-md">
+                    📋 Salin
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode B: Frasa Cepat / Kamus Frasa View (From Gambar 2) -->
+        <div id="ngobrol-frasa-view" class="space-y-3 hidden">
+          <!-- Category Chips -->
+          <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
+            <button class="px-3 py-1 text-xs font-bold rounded-xl tsel-chip-active">🗣️ Dasar</button>
+            <button class="px-3 py-1 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">🛍️ Belanja</button>
+            <button class="px-3 py-1 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">🍣 Makan</button>
+            <button class="px-3 py-1 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">🚆 Kereta</button>
+          </div>
+
+          <!-- Phrase Card 1 -->
+          <div class="tsel-card rounded-2xl p-3 space-y-1.5">
+            <div class="text-xs font-bold text-[var(--text-main)]">Permisi / Maaf</div>
+            <div class="text-xs font-semibold text-red-600 dark:text-red-400">Sumimasen</div>
+            <div class="text-[11px] text-[var(--text-sub)]">すみません</div>
+            <div class="flex justify-end gap-1.5 pt-1">
+              <button class="px-2.5 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                🔊 Audio
+              </button>
+              <button class="px-2.5 py-1 bg-slate-100 dark:bg-white/10 text-[var(--text-sub)] text-[10px] font-bold rounded-lg">
+                📋 Salin
+              </button>
+            </div>
+          </div>
+
+          <!-- Phrase Card 2 -->
+          <div class="tsel-card rounded-2xl p-3 space-y-1.5">
+            <div class="text-xs font-bold text-[var(--text-main)]">Berapa harganya ini?</div>
+            <div class="text-xs font-semibold text-red-600 dark:text-red-400">Kore wa ikura desu ka?</div>
+            <div class="text-[11px] text-[var(--text-sub)]">これはいくらですか？</div>
+            <div class="flex justify-end gap-1.5 pt-1">
+              <button class="px-2.5 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-lg flex items-center gap-1">
+                🔊 Audio
+              </button>
+              <button class="px-2.5 py-1 bg-slate-100 dark:bg-white/10 text-[var(--text-sub)] text-[10px] font-bold rounded-lg">
+                📋 Salin
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-PAGE 2: SCANNER CAMERA & RESULT LIST (From Gambar 3) -->
+      <div id="view-scanner" class="space-y-3.5 hidden">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-lg font-bold text-[var(--text-main)]">Cek Harga AI</h1>
+            <p class="text-[11px] text-[var(--text-sub)]">Scan label harga fisik & komparasi Tokopedia</p>
+          </div>
+          <span class="px-2.5 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-bold rounded-full border border-red-500/20">SCAN</span>
+        </div>
+
+        <!-- Camera Frame Reticle -->
+        <div class="tsel-card rounded-2xl p-4 text-center border-2 border-dashed border-red-500/40 relative space-y-3">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-[#FF0025]/10 to-[#FDA22B]/10 text-red-600 dark:text-red-400 flex items-center justify-center text-xl shadow-xs">
+            📸
+          </div>
+          <div>
+            <div class="text-xs font-bold text-[var(--text-main)]">Kamera Siap Digunakan</div>
+            <div class="text-[10px] text-[var(--text-sub)] mt-0.5">Buka kamera langsung atau unggah foto tag harga</div>
+          </div>
+          <div class="flex gap-2 justify-center pt-1">
+            <button class="px-4 py-2 tsel-btn-primary text-white text-xs font-bold rounded-xl shadow-xs">
+              <span>Buka Kamera Live</span>
+            </button>
+            <button class="px-3 py-2 tsel-card text-[var(--text-main)] text-xs font-bold rounded-xl">
+              Upload Foto
+            </button>
+          </div>
+        </div>
+
+        <!-- Scanned History Card List (From Gambar 3) -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <h2 class="text-xs font-bold text-[var(--text-main)]">Riwayat Scan Tersimpan</h2>
+            <button class="text-[10px] font-bold text-red-600 dark:text-red-400">Tampilkan Semua</button>
+          </div>
+
+          <div class="tsel-card rounded-2xl p-3 flex gap-3 shadow-sm">
+            <img src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150" class="w-14 h-14 rounded-xl object-cover border border-slate-200 dark:border-white/10 shrink-0"/>
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-start gap-1">
+                <div class="text-xs font-bold text-[var(--text-main)] truncate">Nike Zoom Vaporfly NEXT% 3</div>
+                <button class="text-slate-400 hover:text-red-500">🗑️</button>
+              </div>
+              <div class="flex justify-between items-baseline mt-1">
+                <span class="text-[11px] text-[var(--text-sub)]">¥21.000</span>
+                <span class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">Rp 1.800.000</span>
+              </div>
+              <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60 dark:border-white/10 text-[10px]">
+                <span class="text-[10px] text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md font-bold">🇯🇵 Tokyo, JP</span>
+                <a href="#" class="text-red-600 dark:text-red-400 font-bold">Komparasi Tokopedia ↗</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-PAGE 3: SPOT KALCER - TOP 3 REVIEWS & ROUTE (From Gambar 4) -->
+      <div id="view-kalcer" class="space-y-3.5 hidden">
+        <div class="flex justify-between items-center">
+          <div>
+            <h1 class="text-lg font-bold text-[var(--text-main)]">Spot Kalcer 📍</h1>
+            <p class="text-[10px] text-[var(--text-sub)] font-mono">GPS: -6.2453, 106.8523 (Tebet, Jakarta)</p>
+          </div>
+          <button class="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold rounded-full border border-emerald-500/20 flex items-center gap-1">
+            📍 GPS Active
+          </button>
+        </div>
+
+        <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <button class="px-3 py-1.5 text-xs font-bold rounded-xl tsel-chip-active">🔥 Semua</button>
+          <button class="px-3 py-1.5 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">📷 Foto</button>
+          <button class="px-3 py-1.5 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">🍜 Restoran</button>
+          <button class="px-3 py-1.5 text-xs font-semibold rounded-xl tsel-card text-[var(--text-sub)]">🛍️ Belanja</button>
+        </div>
+
+        <!-- Spot Detail Card with Top 3 Reviews (From Gambar 4) -->
+        <div class="tsel-card rounded-2xl p-3.5 space-y-3 shadow-sm">
+          <div class="flex gap-3">
+            <div class="w-14 h-14 rounded-xl bg-red-500/10 text-red-500 font-bold flex items-center justify-center shrink-0 text-xl">🌳</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-1">
+                <div class="text-xs font-bold text-[var(--text-main)] truncate">Tebet Eco Park</div>
+                <span class="px-2 py-0.5 text-[9px] font-bold rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">🟢 Buka</span>
+              </div>
+              <div class="text-[10px] text-[var(--text-sub)] mt-0.5 line-clamp-1">Award-winning urban eco park with canopy bridge...</div>
+              <div class="flex items-center gap-2 mt-1.5">
+                <span class="px-2 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold rounded border border-red-500/20">4.9 ★</span>
+                <span class="text-[10px] text-[var(--text-sub)]">💬 89 ulasan</span>
+                <span class="text-[10px] text-[var(--text-sub)]">📍 840 m</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top 3 Comments Box (From Gambar 4) -->
+          <div class="bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl p-2.5 space-y-1 text-[11px]">
+            <div class="font-bold text-[var(--text-sub)] text-[10px]">💬 Top 3 Komentar:</div>
+            <div class="text-[10px] text-[var(--text-main)]"><span class="font-bold text-red-600 dark:text-red-400">Rian K.:</span> "Tempatnya asri banget buat jogging pagi!"</div>
+            <div class="text-[10px] text-[var(--text-main)]"><span class="font-bold text-red-600 dark:text-red-400">Dini P.:</span> "Spot foto canopy bridge sangat bagus."</div>
+          </div>
+
+          <button class="w-full py-2 bg-slate-100/70 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[var(--text-main)] rounded-xl text-xs font-semibold flex items-center justify-center gap-1 hover:bg-slate-200 transition">
+            <span>Buka Rute Google Maps ↗</span>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="sticky bottom-0 left-0 right-0 h-16 tsel-header backdrop-blur-md border-t flex items-center justify-around px-2 z-30 shrink-0">
+      <button onclick="switchTab('ngobrol')" id="nav-ngobrol" class="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl text-red-600 dark:text-red-400 font-bold">
+        <span>💬</span>
+        <span class="text-[11px]">Ngobrol</span>
+      </button>
+      <button onclick="switchTab('scanner')" id="nav-scanner" class="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl text-[var(--text-sub)] font-medium">
+        <span>📷</span>
+        <span class="text-[11px]">Scanner</span>
+      </button>
+      <button onclick="switchTab('kalcer')" id="nav-kalcer" class="flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl text-[var(--text-sub)] font-medium">
+        <span>📍</span>
+        <span class="text-[11px]">Kalcer</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <script>
+    function setTheme(mode) {
+      const body = document.getElementById('appBody');
+      const lightBtn = document.getElementById('lightBtn');
+      const darkBtn = document.getElementById('darkBtn');
+
+      if (mode === 'dark') {
+        body.classList.add('dark');
+        darkBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition bg-red-500 text-white shadow-xs";
+        lightBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition text-slate-400 hover:text-white";
+      } else {
+        body.classList.remove('dark');
+        lightBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition bg-red-500 text-white shadow-xs";
+        darkBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition text-slate-500 hover:text-slate-900";
+      }
+    }
+
+    function setNgobrolMode(mode) {
+      const chatView = document.getElementById('ngobrol-chat-view');
+      const frasaView = document.getElementById('ngobrol-frasa-view');
+      const btnChat = document.getElementById('btn-mode-chat');
+      const btnFrasa = document.getElementById('btn-mode-frasa');
+
+      if (mode === 'chat') {
+        chatView.classList.remove('hidden');
+        frasaView.classList.add('hidden');
+        btnChat.className = "flex-1 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 shadow-2xs";
+        btnFrasa.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-[var(--text-sub)]";
+      } else {
+        chatView.classList.add('hidden');
+        frasaView.classList.remove('hidden');
+        btnFrasa.className = "flex-1 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 shadow-2xs";
+        btnChat.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-[var(--text-sub)]";
+      }
+    }
+
+    function switchTab(name) {
+      const tabs = ['ngobrol', 'scanner', 'kalcer'];
+      tabs.forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const nav = document.getElementById(`nav-${t}`);
+        if (t === name) {
+          view.classList.remove('hidden');
+          nav.className = "flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl text-red-600 dark:text-red-400 font-bold";
+        } else {
+          view.classList.add('hidden');
+          nav.className = "flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl text-[var(--text-sub)] font-medium";
+        }
+      });
+    }
+  </script>
+</body>
+</html>

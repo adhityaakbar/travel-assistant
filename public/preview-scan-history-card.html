@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pratinjau Kartu Riwayat Scan (THE v2.0) - Travel Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-outer: #F4F6FB;
+      --card-bg: #FFFFFF;
+      --card-border: rgba(0, 26, 65, 0.08);
+      --text-main: #0A1937;
+      --text-sub: #5A6E85;
+    }
+    .dark {
+      --bg-outer: #000E26;
+      --card-bg: #001A41;
+      --card-border: rgba(255, 255, 255, 0.1);
+      --text-main: #FFFFFF;
+      --text-sub: #94A3B8;
+    }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-outer);
+      color: var(--text-main);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+  </style>
+</head>
+<body id="appBody" class="p-4 max-w-md mx-auto min-h-screen flex flex-col justify-center">
+
+  <!-- Theme Toggle -->
+  <div class="flex justify-end mb-4">
+    <div class="flex items-center gap-1 p-1 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+      <button onclick="setTheme('light')" id="lightBtn" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500 text-white shadow-xs">
+        ☀️ Light
+      </button>
+      <button onclick="setTheme('dark')" id="darkBtn" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+        🌙 Dark
+      </button>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <div class="text-xs font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+      Desain Kartu Scanner (Telkomsel THE v2.0)
+    </div>
+    
+    <!-- NEW CARD COMPONENT -->
+    <div class="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-3.5 flex items-start gap-3 shadow-sm transition">
+      <!-- Thumbnail -->
+      <div class="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200/80 dark:border-white/10 bg-slate-100 dark:bg-white/5">
+        <img 
+          src="https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150&auto=format&fit=crop&q=80" 
+          alt="Nike Zoom Vaporfly" 
+          class="w-full h-full object-cover"
+        />
+      </div>
+
+      <!-- Content Details -->
+      <div class="min-w-0 flex-1 space-y-1">
+        <!-- Row 1: Title, Copy Icon & Delete Action -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-1.5 min-w-0 flex-1">
+            <span class="text-sm font-bold text-[var(--text-main)] truncate" title="Nike Zoom Vaporfly NEXT% 3">
+              Nike Zoom Vaporfly NEXT% 3
+            </span>
+            <button 
+              type="button" 
+              class="p-1 rounded text-[var(--text-sub)] hover:text-red-500 hover:bg-red-500/10 transition shrink-0 flex items-center" 
+              title="Salin Nama Produk"
+            >
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+          <button 
+            class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition shrink-0" 
+            title="Hapus riwayat scanner ini" 
+            aria-label="Hapus riwayat scanner"
+          >
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+        <!-- Row 2: Original Price vs Indonesia Estimate -->
+        <div class="flex items-baseline justify-between gap-2 pt-0.5">
+          <div class="text-xs text-[var(--text-sub)] font-medium">
+            ¥21.000
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
+              Rp 1.800.000
+            </div>
+            <div class="text-[10px] font-medium text-slate-400">Estimasi Indo</div>
+          </div>
+        </div>
+
+        <!-- Row 3: Date & Location Tags -->
+        <div class="flex items-center justify-between gap-2 text-[11px] text-[var(--text-sub)] pt-0.5">
+          <span>9 Okt 2026</span>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-500/20">
+              <span>🇯🇵</span>
+              <span class="truncate max-w-[90px]">Tokyo, JP</span>
+            </span>
+            <a 
+              href="#" 
+              class="px-2 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-red-500/20"
+            >
+              Maps ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function setTheme(mode) {
+      const body = document.getElementById('appBody');
+      const lightBtn = document.getElementById('lightBtn');
+      const darkBtn = document.getElementById('darkBtn');
+
+      if (mode === 'dark') {
+        body.classList.add('dark');
+        darkBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500 text-white shadow-xs";
+        lightBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-medium text-slate-400 hover:text-white";
+      } else {
+        body.classList.remove('dark');
+        lightBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500 text-white shadow-xs";
+        darkBtn.className = "px-2.5 py-0.5 rounded-full text-[11px] font-medium text-slate-500 hover:text-slate-900";
+      }
+    }
+  </script>
+</body>
+</html>

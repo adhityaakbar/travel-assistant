@@ -27,7 +27,12 @@ import {
   Trash2,
   Copy,
   Smartphone,
-  Download
+  Download,
+  Luggage,
+  Eye,
+  EyeOff,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
@@ -35,7 +40,7 @@ import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCod
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.4.6';
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.5.0';
 
 export default function App() {
   // Mount State to avoid hydration mismatch
@@ -47,8 +52,24 @@ export default function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginPasscode, setLoginPasscode] = useState('');
+  const [showPasscode, setShowPasscode] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const toggleDarkMode = () => {
+    const nextMode = !isDarkMode;
+    setIsDarkMode(nextMode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('travel_assistant_theme', nextMode ? 'dark' : 'light');
+      if (nextMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  };
 
   // Navigation State
   const [activeTabState, setActiveTabState] = useState('valas');
@@ -201,6 +222,21 @@ export default function App() {
       const storedRemember = localStorage.getItem('travel_assistant_remember_me') !== 'false';
       const storedPasscode = localStorage.getItem('travel_assistant_passcode') || '';
       const storedTab = localStorage.getItem('travel_assistant_active_tab') || 'valas';
+      
+      const storedTheme = localStorage.getItem('travel_assistant_theme');
+      let enableDark = false;
+      if (storedTheme) {
+        enableDark = storedTheme === 'dark';
+      } else {
+        const currentHour = new Date().getHours();
+        enableDark = currentHour < 6 || currentHour >= 18; // Malam: 18:00 - 05:59, Pagi/Siang: 06:00 - 17:59
+      }
+      setIsDarkMode(enableDark);
+      if (enableDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
 
       setToken(storedToken);
       setRememberMe(storedRemember);
@@ -1005,13 +1041,13 @@ export default function App() {
   // ==========================================
   if (!isMounted || isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl flex flex-col items-center justify-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs animate-bounce">
-            <Compass size={32} className="animate-spin" />
+      <div className="min-h-screen bg-[#F4F6FB] dark:bg-[#001A41] flex items-center justify-center p-4 transition-colors">
+        <div className="w-full max-w-sm bg-white/92 dark:bg-[#0A1937]/85 backdrop-blur-xl border border-[#001A41]/10 dark:border-white/10 rounded-3xl p-8 shadow-2xl flex flex-col items-center justify-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-lg animate-bounce">
+            <Luggage size={28} />
           </div>
-          <div className="text-base font-bold font-heading text-slate-800">Memverifikasi Sesi Login...</div>
-          <p className="text-xs text-slate-400">Harap tunggu sebentar</p>
+          <div className="text-base font-bold font-heading text-[#0A1937] dark:text-white">Memverifikasi Sesi Login...</div>
+          <p className="text-xs text-[#5A6E85] dark:text-slate-400">Harap tunggu sebentar</p>
         </div>
       </div>
     );
@@ -1022,39 +1058,52 @@ export default function App() {
   // ==========================================
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs">
-              <Compass size={32} />
+      <div className="min-h-screen bg-[#F4F6FB] dark:bg-[#001A41] flex flex-col items-center justify-center p-4 relative overflow-hidden transition-colors">
+        {/* Ambient Glow */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-sm bg-white/92 dark:bg-[#0A1937]/85 backdrop-blur-xl border border-[#001A41]/10 dark:border-white/10 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 relative z-10">
+          <div className="text-center space-y-2.5">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-md">
+              <Luggage size={24} />
             </div>
-            <h1 className="text-2xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</h1>
-            <p className="text-xs text-slate-500 font-medium">Masuk untuk mengakses kurs live, scanner harga AI & spot kalcer</p>
+            <div>
+              <h1 className="text-xl font-bold font-heading tracking-tight text-[#0A1937] dark:text-white">Travel Assistant</h1>
+              <p className="text-xs text-[#5A6E85] dark:text-slate-400 mt-1">Masukkan passcode untuk melanjutkan</p>
+            </div>
           </div>
 
           {loginError && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold">
               ⚠️ {loginError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wide">Secret Aplikasi</label>
+              <label className="block text-xs font-medium text-[#5A6E85] dark:text-slate-300 mb-1.5">Passcode Aplikasi</label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPasscode ? "text" : "password"}
                   value={loginPasscode}
                   onChange={(e) => setLoginPasscode(e.target.value)}
-                  placeholder="Masukkan secret aplikasi"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                  placeholder="Masukkan passcode"
+                  className="w-full pl-9 pr-10 py-3 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl text-sm font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/15 transition"
                   required
                 />
-                <Lock size={18} className="absolute left-3.5 top-3.5 text-slate-400" />
+                <Lock size={16} className="absolute left-3 top-3.5 text-[#5A6E85] dark:text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscode(!showPasscode)}
+                  className="absolute right-3 top-3.5 text-[#5A6E85] dark:text-slate-400 hover:opacity-100 transition"
+                  title={showPasscode ? "Sembunyikan passcode" : "Tampilkan passcode"}
+                >
+                  {showPasscode ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-600">
+            <div className="flex items-center justify-between text-xs text-[#5A6E85] dark:text-slate-400">
               <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
                 <input
                   type="checkbox"
@@ -1066,16 +1115,16 @@ export default function App() {
                       localStorage.setItem('travel_assistant_remember_me', checked ? 'true' : 'false');
                     }
                   }}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  className="w-4 h-4 text-red-600 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-red-500 cursor-pointer"
                 />
-                <span>Ingat Saya (Remember Me)</span>
+                <span>Ingat sesi saya</span>
               </label>
             </div>
 
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full py-3.5 bg-blue-600 text-white text-sm font-bold rounded-xl shadow-md hover:bg-blue-700 active:scale-98 transition flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white text-sm font-semibold rounded-xl shadow-md hover:opacity-95 active:scale-99 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {loginLoading ? (
                 <>
@@ -1084,18 +1133,16 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <span>Mulai Perjalanan</span>
-                  <span>🚀</span>
+                  <span>Masuk</span>
+                  <ArrowRightLeft size={16} className="rotate-90 sm:rotate-0" />
                 </>
               )}
             </button>
           </form>
 
           {/* Version Tracking Footer */}
-          <div className="pt-2 text-center border-t border-slate-100">
-            <span className="text-[10px] font-mono text-slate-400">
-              Build Version: {APP_VERSION}
-            </span>
+          <div className="pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-center text-[11px] text-[#5A6E85] dark:text-slate-400">
+            <span className="font-mono">v1.5.0</span>
           </div>
 
         </div>
@@ -1107,27 +1154,39 @@ export default function App() {
   // RENDER: MAIN APPLICATION SHELL
   // ==========================================
   return (
-    <div className="h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-100 flex items-center justify-center sm:py-6 sm:px-4 sm:h-auto sm:min-h-[100dvh]">
-      <div className="w-full max-w-[430px] h-[100dvh] sm:h-[860px] sm:max-h-[880px] bg-slate-50 sm:border sm:border-slate-200 sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+    <div className="h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#F4F6FB] dark:bg-[#001A41] flex items-center justify-center sm:py-6 sm:px-4 sm:h-auto sm:min-h-[100dvh] transition-colors">
+      <div className="w-full max-w-[430px] h-[100dvh] sm:h-[860px] sm:max-h-[880px] bg-white dark:bg-[#001A41] sm:border sm:border-slate-200/80 dark:sm:border-white/10 sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative transition-colors">
         
         {/* Hidden Canvas for Camera Snapshots */}
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Top Header */}
-        <header className="px-5 pt-4 pb-3 bg-white border-b border-slate-200/80 flex items-center justify-between z-20 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</span>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">{countryCode}</span>
+        <header className="px-4 pt-3.5 pb-2.5 bg-white/90 dark:bg-[#001A41]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between z-20 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-xs">
+              <Luggage size={18} />
             </div>
-            <div className="text-[10px] text-slate-400 font-mono font-medium -mt-0.5">{APP_VERSION}</div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-base font-extrabold font-heading text-[#0A1937] dark:text-white tracking-tight leading-tight">Travel Assistant</span>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 rounded-md border border-red-500/20">{countryCode}</span>
+              </div>
+              <div className="text-[10px] text-[#5A6E85] dark:text-slate-400 font-mono font-medium -mt-0.5">{APP_VERSION}</div>
+            </div>
           </div>
           
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={toggleDarkMode}
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 transition cursor-pointer"
+            >
+              {isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+            </button>
             <button 
               onClick={handleInstallPwa}
               title="Pasang PWA / Aplikasi"
-              className="w-9 h-9 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 transition relative"
+              className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 transition relative cursor-pointer"
             >
               <Smartphone size={16} />
               {isInstallable && (
@@ -1137,7 +1196,7 @@ export default function App() {
             <button 
               onClick={handleLogout}
               title="Keluar / Logout"
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-600 border border-slate-200 flex items-center justify-center text-slate-600 transition"
+              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/10 hover:text-red-500 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300 transition cursor-pointer"
             >
               <LogOut size={16} />
             </button>
@@ -1154,28 +1213,28 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900">Valas & Kurs Rate</h1>
-                  <p className="text-xs text-slate-500">
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Valas & Kurs Rate</h1>
+                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">
                     1 {activeChip} = {formatChipRate(ratesData, activeChip)} • {rateSource === 'bca' ? 'BCA e-Rate' : 'Live Rate'}
                   </p>
                 </div>
                 <button 
                   onClick={loadLiveRates}
                   disabled={ratesLoading}
-                  className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200 flex items-center gap-1.5 shadow-2xs hover:bg-emerald-100 transition"
+                  className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20 flex items-center gap-1.5 shadow-2xs hover:bg-emerald-500/20 transition cursor-pointer"
                 >
-                  <RefreshCw size={12} className={ratesLoading ? "animate-spin text-emerald-600" : "text-emerald-600"} />
+                  <RefreshCw size={12} className={ratesLoading ? "animate-spin text-emerald-600 dark:text-emerald-400" : "text-emerald-600 dark:text-emerald-400"} />
                   <span>{ratesLoading ? 'Sync...' : 'LIVE'}</span>
                 </button>
               </div>
 
               {/* Converter Interactive Box */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm relative space-y-3">
+              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm relative space-y-3">
                 {/* Valas Input Box */}
-                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition">
+                <div className="bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xl leading-none">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
-                    <span className="text-lg font-bold text-slate-800 font-heading">{activeChip}</span>
+                    <span className="text-lg font-bold text-[#0A1937] dark:text-white font-heading">{activeChip}</span>
                   </div>
                   <input 
                     type="text"
@@ -1183,15 +1242,15 @@ export default function App() {
                     value={displayedAmount(sourceAmount)}
                     onChange={(e) => handleSourceChange(e.target.value)}
                     placeholder="0"
-                    className="w-full text-right text-2xl font-extrabold text-slate-900 font-heading bg-transparent outline-none"
+                    className="w-full text-right text-2xl font-extrabold text-[#0A1937] dark:text-white font-heading bg-transparent outline-none"
                   />
                 </div>
 
                 {/* IDR Result Box */}
-                <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition">
+                <div className="bg-red-500/10 dark:bg-red-500/15 border border-red-500/20 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xl leading-none">🇮🇩</span>
-                    <span className="text-lg font-bold text-blue-900 font-heading">IDR</span>
+                    <span className="text-lg font-bold text-red-600 dark:text-red-400 font-heading">IDR</span>
                   </div>
                   <input 
                     type="text"
@@ -1199,7 +1258,7 @@ export default function App() {
                     value={displayedAmount(idrAmount)}
                     onChange={(e) => handleIdrChange(e.target.value)}
                     placeholder="0"
-                    className="w-full text-right text-2xl font-extrabold text-blue-900 font-heading bg-transparent outline-none"
+                    className="w-full text-right text-2xl font-extrabold text-red-600 dark:text-red-400 font-heading bg-transparent outline-none"
                   />
                 </div>
 
@@ -1208,14 +1267,14 @@ export default function App() {
                   value={conversionNote}
                   onChange={(e) => setConversionNote(e.target.value)}
                   placeholder="Catatan (opsional)"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-base sm:text-xs"
+                  className="w-full px-3 py-2 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl text-base sm:text-xs text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025]"
                 />
                 {conversionError && <p role="alert" className="text-xs text-red-600">{conversionError}</p>}
                 {!isConversionRateAvailable(ratesData.IDR, ratesData[activeChip]) && sourceAmount > 0 && <p role="alert" className="text-xs text-red-600">Kurs belum tersedia. Muat ulang kurs sebelum menyimpan konversi.</p>}
                 <button
                   onClick={saveCurrentConversion}
                   disabled={savingConversion || sourceAmount <= 0 || !isConversionRateAvailable(ratesData.IDR, ratesData[activeChip])}
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white text-xs font-bold rounded-xl shadow-xs hover:opacity-95 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   <BookmarkPlus size={14} />
                   <span>{savingConversion ? 'Menyimpan ke Supabase...' : 'Simpan ke Riwayat Konversi'}</span>
@@ -1231,17 +1290,17 @@ export default function App() {
                       <button 
                         key={curr}
                         onClick={() => { setActiveChip(curr); recalculate(sourceAmount, curr); }}
-                        className={`min-w-[105px] shrink-0 snap-start p-2.5 text-left rounded-xl transition border flex flex-col justify-between min-h-[54px] ${
+                        className={`min-w-[105px] shrink-0 snap-start p-2.5 text-left rounded-xl transition border flex flex-col justify-between min-h-[54px] cursor-pointer ${
                           activeChip === curr 
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-600/20' 
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                            ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white border-transparent shadow-xs font-bold' 
+                            : 'bg-[#F4F6FB] dark:bg-[#0A1937]/80 border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'
                         }`}
                       >
                         <span className="text-xs font-extrabold flex items-center justify-between w-full">
                           <span>{curr}</span>
                           <span className="text-sm leading-none">{CURRENCY_FLAGS[curr] || '🏳️'}</span>
                         </span>
-                        <span className={`text-[11px] font-semibold tracking-tight ${activeChip === curr ? 'text-blue-100' : 'text-slate-500'}`}>
+                        <span className={`text-[11px] font-semibold tracking-tight ${activeChip === curr ? 'text-white/90' : 'text-[#5A6E85] dark:text-slate-400'}`}>
                           {rateText || '...'}
                         </span>
                       </button>
@@ -1252,37 +1311,37 @@ export default function App() {
 
               {/* Recent Conversions from Supabase */}
               <div>
-                <h2 className="text-sm font-bold font-heading text-slate-900 mb-2.5">Riwayat Konversi Terakhir</h2>
+                <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white mb-2.5">Riwayat Konversi Terakhir</h2>
                 <div className="space-y-2">
                   {conversionHistory.length === 0 ? (
-                    <div className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">
+                    <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-4 text-center text-xs text-[#5A6E85] dark:text-slate-400">
                       Belum ada konversi tersimpan.
                     </div>
                   ) : (
                     conversionHistory.map((item, idx) => (
                       editingConversion?.id === item.id ? (
-                        <div key={item.id || idx} className="bg-white border border-blue-200 rounded-xl p-3 space-y-2">
-                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-base sm:text-xs" />
+                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-red-500/30 rounded-xl p-3 space-y-2">
+                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-lg text-base sm:text-xs text-[#0A1937] dark:text-white" />
                           <div className="flex gap-2">
-                            <button onClick={() => updateConversion(editingConversion)} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">Simpan</button>
-                            <button onClick={() => setEditingConversion(null)} className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-bold">Batal</button>
+                            <button onClick={() => updateConversion(editingConversion)} className="flex-1 py-2 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-lg text-xs font-bold shadow-xs hover:opacity-95 transition cursor-pointer">Simpan</button>
+                            <button onClick={() => setEditingConversion(null)} className="px-3 py-2 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold cursor-pointer">Batal</button>
                           </div>
                         </div>
                       ) : (
-                        <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2 shadow-2xs">
+                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-2xs">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-base shrink-0">¥</div>
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-base shrink-0">¥</div>
                             <div className="min-w-0">
-                              <div className="text-sm font-bold text-slate-900 truncate">{item.from_currency} {formatAmount(item.from_amount)}</div>
-                              <div className="text-xs text-slate-400 truncate">{item.note ? `${item.note} • ` : ''}{new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                              <div className="text-sm font-bold text-[#0A1937] dark:text-white truncate">{item.from_currency} {formatAmount(item.from_amount)}</div>
+                              <div className="text-xs text-[#5A6E85] dark:text-slate-400 truncate">{item.note ? `${item.note} • ` : ''}{new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-sm font-bold text-emerald-600">Rp {formatAmount(item.to_amount)}</div>
-                            <div className="text-[10px] text-slate-400">Kurs {Number(item.exchange_rate).toFixed(1)}</div>
+                            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Rp {formatAmount(item.to_amount)}</div>
+                            <div className="text-[10px] text-[#5A6E85] dark:text-slate-400">Kurs {Number(item.exchange_rate).toFixed(1)}</div>
                             <div className="flex justify-end gap-1 mt-1">
-                              <button aria-label="Edit konversi" onClick={() => setEditingConversion({ ...item })} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil size={14} /></button>
-                              <button aria-label="Hapus konversi" onClick={() => deleteConversion(item.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 size={14} /></button>
+                              <button aria-label="Edit konversi" onClick={() => setEditingConversion({ ...item })} className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded cursor-pointer"><Pencil size={14} /></button>
+                              <button aria-label="Hapus konversi" onClick={() => deleteConversion(item.id)} className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded cursor-pointer"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         </div>
@@ -1301,14 +1360,14 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900">Cek Harga AI</h1>
-                  <p className="text-xs text-slate-500">Scan label harga fisik & komparasi Tokopedia</p>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Cek Harga AI</h1>
+                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Scan label harga fisik & komparasi Tokopedia</p>
                 </div>
-                <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-full border border-blue-200">SCAN</span>
+                <span className="px-2.5 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold rounded-full border border-red-500/20">SCAN</span>
               </div>
 
               {/* Real Camera Viewfinder / Capture Box */}
-              <div className={`bg-white border-2 border-dashed border-blue-400 rounded-2xl text-center shadow-xs overflow-hidden relative transition-all ${isCameraActive ? 'p-0 border-solid border-slate-900' : 'p-4'}`}>
+              <div className={`bg-white dark:bg-[#0A1937]/80 border-2 border-dashed border-red-500/40 rounded-2xl text-center shadow-xs overflow-hidden relative transition-all ${isCameraActive ? 'p-0 border-solid border-slate-900' : 'p-4'}`}>
                 {isCameraActive ? (
                   <div className="relative w-full h-[400px] sm:h-[460px] bg-black overflow-hidden flex flex-col justify-between">
                     <video 
@@ -1322,10 +1381,10 @@ export default function App() {
                     {/* Viewfinder Target Reticle Overlay */}
                     <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
                       <div className="w-56 h-56 border-2 border-white/60 rounded-2xl relative shadow-lg">
-                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-blue-500 rounded-tl-lg"></div>
-                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-blue-500 rounded-tr-lg"></div>
-                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-blue-500 rounded-bl-lg"></div>
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-blue-500 rounded-br-lg"></div>
+                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-red-500 rounded-tl-lg"></div>
+                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-red-500 rounded-tr-lg"></div>
+                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-red-500 rounded-bl-lg"></div>
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-red-500 rounded-br-lg"></div>
                       </div>
                       <span className="mt-4 px-3 py-1 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium rounded-full shadow-md">
                         Arahkan kamera ke tag harga / produk
@@ -1359,10 +1418,10 @@ export default function App() {
                     <div className="relative z-10 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex items-center justify-center">
                       <button 
                         onClick={capturePhoto}
-                        className="w-16 h-16 rounded-full border-4 border-white bg-blue-600 hover:bg-blue-500 flex items-center justify-center shadow-xl active:scale-95 transition transform"
+                        className="w-16 h-16 rounded-full border-4 border-white bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] hover:opacity-95 flex items-center justify-center shadow-xl active:scale-95 transition transform cursor-pointer"
                         title="Ambil Foto Tag Harga"
                       >
-                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-blue-600">
+                        <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-red-600">
                           <Camera size={22} />
                         </div>
                       </button>
@@ -1370,24 +1429,24 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="py-6 space-y-3">
-                    <div className="w-14 h-14 mx-auto rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-2xl shadow-2xs">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-[#FF0025]/10 to-[#FDA22B]/10 text-red-600 dark:text-red-400 flex items-center justify-center text-2xl shadow-2xs">
                       📸
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-slate-900">Kamera Siap Digunakan</div>
-                      <div className="text-xs text-slate-500 mt-0.5">Buka kamera langsung atau unggah foto tag harga</div>
+                      <div className="text-sm font-bold text-[#0A1937] dark:text-white font-heading">Kamera Siap Digunakan</div>
+                      <div className="text-xs text-[#5A6E85] dark:text-slate-400 mt-0.5">Buka kamera langsung atau unggah foto tag harga</div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-center">
                       <button 
                         onClick={startCamera}
-                        className="px-5 py-2.5 bg-blue-600 text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 hover:bg-blue-700 transition"
+                        className="px-5 py-2.5 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white text-xs font-bold rounded-xl shadow-xs flex items-center justify-center gap-2 hover:opacity-95 transition cursor-pointer"
                       >
                         <Camera size={16} />
                         <span>Buka Kamera Live</span>
                       </button>
 
-                      <label className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 cursor-pointer transition">
+                      <label className="px-4 py-2.5 bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/15 cursor-pointer transition">
                         <Upload size={14} />
                         <span>Upload Foto</span>
                         <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
@@ -1408,10 +1467,10 @@ export default function App() {
 
               {/* Scanned Result Card */}
               {scannedResult && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
+                <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
                   <button
                     onClick={() => { setScannedResult(null); setScannedResultSaved(false); }}
-                    className="absolute top-3 right-3 w-7 h-7 rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 flex items-center justify-center text-xs font-bold transition z-10"
+                    className="absolute top-3 right-3 w-7 h-7 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-xs font-bold transition z-10 cursor-pointer"
                     title="Tutup / Hapus Hasil Scan"
                   >
                     ✕
@@ -1419,7 +1478,7 @@ export default function App() {
                   {scannedResult.image_url && (
                     <div 
                       onClick={() => setPreviewImageUrl(scannedResult.image_url)}
-                      className="w-full h-36 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center cursor-pointer hover:opacity-90 transition group relative"
+                      className="w-full h-36 bg-slate-100 dark:bg-white/5 rounded-xl overflow-hidden border border-slate-200/80 dark:border-white/10 flex items-center justify-center cursor-pointer hover:opacity-90 transition group relative"
                       title="Klik untuk memperbesar gambar"
                     >
                       <img src={scannedResult.image_url} alt="Scanned" className="w-full h-full object-cover group-hover:scale-102 transition duration-300" />
@@ -1430,15 +1489,15 @@ export default function App() {
                   )}
 
                   <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-md border border-emerald-200 flex items-center gap-1">
+                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
                       <Check size={12} />
                       AI Terverifikasi
                     </span>
-                    {scannedResult.confidence != null && <span className="text-xs text-slate-400">Confidence {scannedResult.confidence}</span>}
+                    {scannedResult.confidence != null && <span className="text-xs text-[#5A6E85] dark:text-slate-400">Confidence {scannedResult.confidence}</span>}
                   </div>
 
                   <div className="flex items-center gap-2 pr-8">
-                    <h2 className="text-base font-bold font-heading text-slate-900">{scannedResult.product_name}</h2>
+                    <h2 className="text-base font-bold font-heading text-[#0A1937] dark:text-white">{scannedResult.product_name}</h2>
                     <button
                       type="button"
                       onClick={() => {
@@ -1448,13 +1507,13 @@ export default function App() {
                           setTimeout(() => setCopiedProductName(false), 2000);
                         }
                       }}
-                      className="p-1 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200/80"
+                      className="p-1 text-[#5A6E85] dark:text-slate-300 hover:text-[#0A1937] dark:hover:text-white bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200/80 dark:border-white/10 cursor-pointer"
                       title="Salin Nama Barang"
                     >
                       {copiedProductName ? (
                         <>
-                          <Check size={13} className="text-emerald-600" />
-                          <span className="text-[11px] text-emerald-700 font-semibold">Tersalin</span>
+                          <Check size={13} className="text-emerald-600 dark:text-emerald-400" />
+                          <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">Tersalin</span>
                         </>
                       ) : (
                         <>
@@ -1467,9 +1526,9 @@ export default function App() {
 
                   <div className="flex items-center gap-2">
                     {scannedResult.location_name && (
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md font-medium">
+                      <div className="flex items-center gap-1 text-[11px] text-[#5A6E85] dark:text-slate-300 bg-slate-100 dark:bg-white/10 px-2.5 py-1 rounded-md font-medium">
                         <span className="text-xs">{getCountryFlagFromCoords(scannedResult.latitude, scannedResult.longitude, scannedResult.location_name)}</span>
-                        <MapPin size={12} className="text-emerald-600" />
+                        <MapPin size={12} className="text-emerald-600 dark:text-emerald-400" />
                         <span>{scannedResult.location_name}</span>
                       </div>
                     )}
@@ -1579,75 +1638,83 @@ export default function App() {
                     </div>
                   ) : (
                     scanHistoryList.map((item, idx) => (
-                      <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs gap-3">
+                      <div key={item.id || idx} className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-slate-300 transition">
                         {item.image_url ? (
                           <img 
                             src={item.image_url} 
                             alt={item.product_name} 
                             onClick={() => setPreviewImageUrl(item.image_url)}
-                            className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-pointer hover:opacity-85 transition hover:scale-105" 
+                            className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100 cursor-pointer hover:opacity-90 transition hover:scale-102" 
                             title="Klik untuk memperbesar gambar"
                           />
                         ) : (
-                          <div className="w-14 h-14 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-xl font-bold border border-slate-200">
+                          <div className="w-16 h-16 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60">
                             📷
                           </div>
                         )}
-                        <div className="min-w-0 flex-1 pr-1">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-sm font-bold text-slate-900 truncate">{item.product_name}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyHistoryTitle(item.product_name, item.id || idx)}
-                              className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
-                              title="Salin Nama Produk"
-                            >
-                              {copiedHistoryId === (item.id || idx) ? (
-                                <Check size={13} className="text-emerald-600 font-bold" />
-                              ) : (
-                                <Copy size={13} />
-                              )}
-                            </button>
-                          </div>
-                          <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
-                            <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
-                            <span>•</span>
-                            <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
-                            {(item.location_name || item.locationName) && (
-                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
-                                <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
-                                📍 {item.location_name || item.locationName}
-                              </span>
-                            )}
-                            {item.latitude != null && item.longitude != null && (
-                              <a
-                                href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-1.5 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded font-semibold text-[10px] flex items-center gap-0.5 transition"
-                                title="Buka Lokasi Scan di Google Maps"
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className="text-sm font-bold text-slate-900 truncate" title={item.product_name}>{item.product_name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyHistoryTitle(item.product_name, item.id || idx)}
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
+                                title="Salin Nama Produk"
                               >
-                                Maps ↗
-                              </a>
+                                {copiedHistoryId === (item.id || idx) ? (
+                                  <Check size={14} className="text-emerald-600 font-bold" />
+                                ) : (
+                                  <Copy size={14} />
+                                )}
+                              </button>
+                            </div>
+                            {item.id && (
+                              <button
+                                onClick={() => deleteScanHistoryItem(item.id)}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                                title="Hapus riwayat scanner ini"
+                                aria-label="Hapus riwayat scanner"
+                              >
+                                <Trash2 size={15} />
+                              </button>
                             )}
                           </div>
-                        </div>
-                        <div className="text-right shrink-0 flex items-center gap-2">
-                          <div>
-                            <div className="text-sm font-bold text-emerald-600">
-                              {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga tidak tersedia'}
+
+                          <div className="flex items-baseline justify-between gap-2 pt-0.5">
+                            <div className="text-xs text-slate-500 font-medium">
+                              {item.price_jpy != null ? `¥${Number(item.price_jpy).toLocaleString('id-ID')}` : '-'}
                             </div>
-                            <div className="text-[10px] text-slate-400">Estimasi Indo</div>
+                            <div className="text-right">
+                              <div className="text-sm font-extrabold text-emerald-600 leading-tight">
+                                {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga N/A'}
+                              </div>
+                              <div className="text-[10px] font-medium text-slate-400">Estimasi Indo</div>
+                            </div>
                           </div>
-                          {item.id && (
-                            <button
-                              onClick={() => deleteScanHistoryItem(item.id)}
-                              className="text-red-500 hover:bg-red-50 p-1.5 rounded-lg text-xs font-bold transition"
-                              title="Hapus riwayat scanner ini"
-                            >
-                              🗑️
-                            </button>
-                          )}
+
+                          <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-0.5">
+                            <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                            <div className="flex items-center gap-1.5">
+                              {(item.location_name || item.locationName) && (
+                                <span className="text-[10px] text-emerald-800 bg-emerald-50/80 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100">
+                                  <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
+                                  <span className="truncate max-w-[100px]">{item.location_name || item.locationName}</span>
+                                </span>
+                              )}
+                              {item.latitude != null && item.longitude != null && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100"
+                                  title="Buka Lokasi Scan di Google Maps"
+                                >
+                                  Maps ↗
+                                </a>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -1664,23 +1731,23 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900">Ngobrol 💬</h1>
-                  <p className="text-xs text-slate-500">Terjemahan Suara & Frasa Instan</p>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Ngobrol 💬</h1>
+                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Terjemahan Suara & Frasa Instan</p>
                 </div>
-                <span className="px-2.5 py-1 bg-purple-50 text-purple-600 text-xs font-bold rounded-full border border-purple-200">VOICE</span>
+                <span className="px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full border border-amber-500/20">VOICE</span>
               </div>
 
               {/* Voice Card Input */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm text-center relative space-y-3">
-                <div className="flex justify-between items-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-blue-600 gap-2">
+              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm text-center relative space-y-3">
+                <div className="flex justify-between items-center bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 gap-2">
                   <select 
                     aria-label="Bahasa sumber" 
                     value={sourceLanguage} 
                     onChange={updateChatLanguage(setSourceLanguage)} 
-                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] dark:text-white"
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`src-${lang.code}`} value={lang.code.split('-')[0]}>
+                      <option key={`src-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] dark:text-white">
                         {lang.flag} {lang.name}
                       </option>
                     ))}
@@ -1692,7 +1759,7 @@ export default function App() {
                       setSourceLanguage(targetLanguage);
                       setTargetLanguage(temp);
                     }}
-                    className="p-1 hover:bg-slate-200 rounded-md transition text-slate-500"
+                    className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-md transition text-slate-500 cursor-pointer"
                     title="Tukar Bahasa"
                   >
                     <ArrowRightLeft size={14} />
@@ -1702,10 +1769,10 @@ export default function App() {
                     aria-label="Bahasa target" 
                     value={targetLanguage} 
                     onChange={updateChatLanguage(setTargetLanguage)} 
-                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold"
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] dark:text-white"
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`tgt-${lang.code}`} value={lang.code.split('-')[0]}>
+                      <option key={`tgt-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] dark:text-white">
                         {lang.flag} {lang.name}
                       </option>
                     ))}
@@ -1713,7 +1780,7 @@ export default function App() {
                 </div>
 
                 {/* Enhanced Text Input Controls Bar */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2.5 shadow-2xs">
+                <div className="bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 space-y-2.5 shadow-2xs">
                   <div className="relative">
                     <textarea 
                       rows={3}
@@ -1726,12 +1793,12 @@ export default function App() {
                         }
                       }}
                       placeholder="Ketik kalimat atau tekan mic untuk bicara..."
-                      className="w-full bg-white border border-slate-200 rounded-xl p-3 pr-8 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition resize-none leading-relaxed shadow-2xs"
+                      className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-3 pr-8 text-xs font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/20 transition resize-none leading-relaxed shadow-2xs"
                     />
                     {inputText && (
                       <button
                         onClick={() => updateChatInput('')}
-                        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition text-xs font-bold"
+                        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10 transition text-xs font-bold"
                         title="Bersihkan teks input"
                       >
                         ✕
@@ -1742,10 +1809,10 @@ export default function App() {
                   <div className="flex items-center justify-between gap-2 pt-0.5">
                     <button 
                       onClick={toggleListening}
-                      className={`px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-white text-xs font-bold shrink-0 shadow-xs transition active:scale-95 ${
+                      className={`px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-white text-xs font-bold shrink-0 shadow-xs transition active:scale-95 cursor-pointer ${
                         isListening 
                           ? 'bg-red-500 hover:bg-red-600 animate-pulse ring-2 ring-red-300' 
-                          : 'bg-slate-800 hover:bg-slate-900'
+                          : 'bg-slate-800 dark:bg-white/15 hover:bg-slate-900 dark:hover:bg-white/25'
                       }`}
                       title="Tekan untuk Bicara (Web Speech API)"
                     >
@@ -1754,13 +1821,13 @@ export default function App() {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      <span className="hidden sm:inline text-[10px] text-slate-400 font-medium">
+                      <span className="hidden sm:inline text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium">
                         Enter untuk kirim
                       </span>
                       <button 
                         onClick={() => translateMessage()} 
                         disabled={chatLoading || !inputText.trim()} 
-                        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-40 flex items-center gap-1.5"
+                        className="px-4 py-2.5 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-xl text-xs font-bold shadow-xs hover:opacity-95 transition active:scale-95 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                         title="Kirim Pesan"
                       >
                         <span>{chatLoading ? 'Proses' : 'Kirim'}</span>
@@ -1798,13 +1865,13 @@ export default function App() {
                 )}
                 
                 {/* Fixed Height Scrollable Chat Box Container */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-3 max-h-80 overflow-y-auto text-left">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-700">💬 Obrolan ({chatMessages.length})</span>
+                <div className="bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/10 rounded-2xl p-3 space-y-3 max-h-80 overflow-y-auto text-left">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/80 dark:border-white/10 text-xs text-[#5A6E85] dark:text-slate-400">
+                    <span className="font-semibold text-[#0A1937] dark:text-white">💬 Obrolan ({chatMessages.length})</span>
                     {chatMessages.length > 0 && (
                       <button
                         onClick={() => setChatMessages([])}
-                        className="text-[11px] text-red-500 hover:text-red-700 font-semibold flex items-center gap-1"
+                        className="text-[11px] text-red-600 dark:text-red-400 hover:opacity-80 font-semibold flex items-center gap-1 cursor-pointer"
                         title="Bersihkan percakapan di chat box"
                       >
                         🗑️ Bersihkan Chat
@@ -1813,15 +1880,15 @@ export default function App() {
                   </div>
 
                   {chatMessages.length === 0 ? (
-                    <p className="text-center text-xs text-slate-400 py-6">
+                    <p className="text-center text-xs text-[#5A6E85] dark:text-slate-400 py-6">
                       Belum ada pesan. Ketik kalimat atau tekan mic untuk mulai ngobrol.
                     </p>
                   ) : (
                     chatMessages.map((msg, mIdx) => (
-                      <div key={msg.id || mIdx} className="space-y-1.5 p-2.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <div key={msg.id || mIdx} className="space-y-1.5 p-2.5 bg-white dark:bg-[#0A1937]/80 rounded-xl border border-slate-200/80 dark:border-white/10 shadow-2xs">
                         <div className={`flex ${getBubbleSide(msg.sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] rounded-xl px-3 py-1.5 text-xs ${
-                            getBubbleSide(msg.sourceLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-900'
+                            getBubbleSide(msg.sourceLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-slate-200 dark:bg-white/10 text-[#0A1937] dark:text-white'
                           }`}>
                             <div className="text-[9px] font-bold uppercase opacity-80">{getLanguageLabel(msg.sourceLanguage)}</div>
                             <div className="font-medium">{msg.sourceText}</div>
@@ -1830,21 +1897,21 @@ export default function App() {
 
                         <div className={`flex ${getBubbleSide(msg.targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs relative ${
-                            getBubbleSide(msg.targetLanguage) === 'right' ? 'bg-blue-600 text-white' : 'bg-emerald-600 text-white'
+                            getBubbleSide(msg.targetLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-emerald-600 dark:bg-emerald-700 text-white'
                           }`}>
                             <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-0.5 mb-1">
                               <span className="text-[9px] text-white/80 font-bold uppercase">{getLanguageLabel(msg.targetLanguage)}</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => saveChat(msg)}
-                                  className="p-0.5 hover:bg-white/20 rounded transition text-white text-[10px] flex items-center gap-0.5 font-semibold"
+                                  className="p-0.5 hover:bg-white/20 rounded transition text-white text-[10px] flex items-center gap-0.5 font-semibold cursor-pointer"
                                   title="Simpan percakapan ini ke Database"
                                 >
                                   💾 Simpan
                                 </button>
                                 <button 
                                   onClick={() => playAudio(msg.translatedText, msg.targetLanguage, msg.id || mIdx)}
-                                  className="p-0.5 hover:bg-white/20 rounded transition text-white"
+                                  className="p-0.5 hover:bg-white/20 rounded transition text-white cursor-pointer"
                                   title="Putar Audio"
                                 >
                                   <Volume2 size={13} className={playingAudioId === (msg.id || mIdx) ? 'animate-bounce text-yellow-300' : ''} />
@@ -1876,7 +1943,7 @@ export default function App() {
                     <button 
                       onClick={() => saveChat()} 
                       disabled={chatSaving} 
-                      className="flex-1 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50"
+                      className="flex-1 py-2 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 cursor-pointer"
                     >
                       {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan Terbaru ke DB'}
                     </button>
@@ -1887,11 +1954,11 @@ export default function App() {
               {/* History Percakapan */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-sm font-bold font-heading text-slate-900">Percakapan Tersimpan ({chatHistory.length})</h2>
+                  <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Percakapan Tersimpan ({chatHistory.length})</h2>
                   {chatHistory.length > 5 && (
                     <button
                       onClick={() => setShowAllHistoryModal(true)}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-bold"
+                      className="text-xs text-red-600 dark:text-red-400 hover:underline font-bold cursor-pointer"
                     >
                       Lihat Semua →
                     </button>
@@ -1899,47 +1966,47 @@ export default function App() {
                 </div>
 
                 {chatHistoryLoading ? (
-                  <p className="text-xs text-slate-500">Memuat riwayat percakapan...</p>
+                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Memuat riwayat percakapan...</p>
                 ) : chatHistory.length === 0 ? (
-                  <p className="bg-white border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">Belum ada percakapan tersimpan.</p>
+                  <p className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-4 text-center text-xs text-[#5A6E85] dark:text-slate-400">Belum ada percakapan tersimpan.</p>
                 ) : (
                   <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 pt-1">
                     {chatHistory.slice(0, 5).map((item) => (
                       <div 
                         key={item.id} 
-                        className="min-w-[220px] max-w-[240px] h-[130px] bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-blue-300 transition shrink-0 relative"
+                        className="min-w-[220px] max-w-[240px] h-[130px] bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition shrink-0 relative"
                       >
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteChat(item.id);
                           }}
-                          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10"
+                          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
                           title="Hapus percakapan tersimpan"
                         >
                           ✕
                         </button>
                         <div className="space-y-1 overflow-hidden cursor-pointer pl-5" onClick={() => loadItemToChat(item)}>
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                          <div className="flex justify-between items-center text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium">
                             <span className="truncate">{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
                           </div>
-                          <div className="text-xs font-semibold text-slate-800 line-clamp-1">{item.source_text}</div>
-                          <div className="text-xs text-blue-900 line-clamp-2 italic">{item.translated_text}</div>
+                          <div className="text-xs font-semibold text-[#0A1937] dark:text-white line-clamp-1">{item.source_text}</div>
+                          <div className="text-xs text-red-600 dark:text-red-400 line-clamp-2 italic">{item.translated_text}</div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1">
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-white/10 mt-1">
                           <button
                             onClick={() => loadItemToChat(item)}
-                            className="text-[11px] text-blue-600 hover:text-blue-700 font-bold"
+                            className="text-[11px] text-red-600 dark:text-red-400 hover:underline font-bold cursor-pointer"
                           >
                             + Muat ke Chat
                           </button>
                           <button 
                             onClick={() => playAudio(item.translated_text, item.target_language, item.id)}
-                            className="text-blue-600 hover:bg-blue-50 p-1 rounded flex items-center gap-1 font-semibold text-xs shrink-0"
+                            className="text-red-600 dark:text-red-400 hover:bg-red-500/10 p-1 rounded flex items-center gap-1 font-semibold text-xs shrink-0 cursor-pointer"
                             title="Putar Audio"
                           >
-                            <Volume2 size={13} className={playingAudioId === item.id ? 'animate-bounce text-blue-600' : ''} /> Play
+                            <Volume2 size={13} className={playingAudioId === item.id ? 'animate-bounce text-red-600' : ''} /> Play
                           </button>
                         </div>
                       </div>
@@ -1948,10 +2015,10 @@ export default function App() {
                     {chatHistory.length > 5 && (
                       <button
                         onClick={() => setShowAllHistoryModal(true)}
-                        className="min-w-[140px] h-[130px] bg-slate-50 hover:bg-slate-100 border border-dashed border-slate-300 rounded-xl p-3 flex flex-col items-center justify-center gap-1 shadow-2xs transition shrink-0 text-slate-600 font-bold text-xs"
+                        className="min-w-[140px] h-[130px] bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-dashed border-slate-300 dark:border-white/20 rounded-xl p-3 flex flex-col items-center justify-center gap-1 shadow-2xs transition shrink-0 text-[#0A1937] dark:text-white font-bold text-xs cursor-pointer"
                       >
                         <span>Lihat Semua</span>
-                        <span className="text-[10px] font-normal text-slate-400">({chatHistory.length - 5} lainnya)</span>
+                        <span className="text-[10px] font-normal text-[#5A6E85] dark:text-slate-400">({chatHistory.length - 5} lainnya)</span>
                       </button>
                     )}
                   </div>
@@ -1961,7 +2028,7 @@ export default function App() {
               {/* Quick Phrases */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-sm font-bold font-heading text-slate-900">Frasa Cepat Praktis ({phrasesList.length})</h2>
+                  <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Frasa Cepat Praktis ({phrasesList.length})</h2>
                   <button
                     onClick={() => {
                       setEditingPhraseIndex(null);
@@ -1969,7 +2036,7 @@ export default function App() {
                       setPhraseInputCategory('🗣️ Dasar');
                       setPhraseModalOpen(true);
                     }}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-2xs"
+                    className="px-2.5 py-1 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer hover:opacity-95"
                   >
                     + Tambah Frasa
                   </button>
@@ -1981,10 +2048,10 @@ export default function App() {
                     <button
                       key={cat}
                       onClick={() => setSelectedPhraseCategory(cat)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition cursor-pointer ${
                         selectedPhraseCategory === cat
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                          ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs'
+                          : 'bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white hover:bg-slate-50 dark:hover:bg-white/15'
                       }`}
                     >
                       {cat}
@@ -1998,7 +2065,7 @@ export default function App() {
                   placeholder="🔍 Cari frasa cepat..."
                   value={phraseSearchQuery}
                   onChange={(e) => setPhraseSearchQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:border-blue-500 mb-2 transition"
+                  className="w-full bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/12 rounded-xl px-3 py-2 text-xs font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] mb-2 transition"
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2008,13 +2075,13 @@ export default function App() {
                   ).map((phrase, idx) => {
                     const realIndex = phrasesList.findIndex(p => p === phrase);
                     return (
-                      <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-blue-300 transition">
+                      <div key={idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-red-500/40 transition">
                         <div 
                           onClick={() => updateChatInput(phrase.text)}
                           className="space-y-0.5 min-w-0 pr-2 cursor-pointer flex-1"
                         >
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{phrase.category}</span>
-                          <div className="text-xs font-medium text-slate-800 line-clamp-2 mt-1">{phrase.text}</div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 text-[#5A6E85] dark:text-slate-300 rounded">{phrase.category}</span>
+                          <div className="text-xs font-medium text-[#0A1937] dark:text-white line-clamp-2 mt-1">{phrase.text}</div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
@@ -2110,9 +2177,9 @@ export default function App() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900">Spot Kalcer 📍</h1>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Spot Kalcer 📍</h1>
                   {userLocation && (
-                    <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                    <p className="text-[11px] text-[#5A6E85] dark:text-slate-400 font-mono mt-0.5">
                       GPS: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
                     </p>
                   )}
@@ -2120,10 +2187,10 @@ export default function App() {
                 <button
                   onClick={requestUserLocation}
                   disabled={locatingUser}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-full border flex items-center gap-1.5 shadow-2xs transition ${
+                  className={`px-3 py-1.5 text-xs font-bold rounded-full border flex items-center gap-1.5 shadow-2xs transition cursor-pointer ${
                     userLocation && !locatingUser
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                      : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 hover:bg-red-500/20'
                   }`}
                 >
                   <Navigation size={12} className={locatingUser ? "animate-spin" : (userLocation ? "text-emerald-500 animate-pulse" : "")} />
@@ -2137,10 +2204,10 @@ export default function App() {
                   <button
                     key={c.id}
                     onClick={() => handleSpotFilterChange(c.id)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition ${
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition cursor-pointer ${
                       spotFilter === c.id
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs'
+                        : 'bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white hover:bg-slate-50 dark:hover:bg-white/15'
                     }`}
                   >
                     {c.label}
@@ -2148,7 +2215,7 @@ export default function App() {
                 ))}
                 <button
                   onClick={() => setShowAddCatModal(true)}
-                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 whitespace-nowrap transition shadow-2xs"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 whitespace-nowrap transition shadow-2xs cursor-pointer"
                 >
                   + Kategori
                 </button>
@@ -2157,19 +2224,19 @@ export default function App() {
               {/* Spot Cards */}
               <div className="space-y-3">
                 {loadingSpots ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400">
-                    <RefreshCw size={18} className="animate-spin mx-auto mb-2 text-blue-600" />
+                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-6 text-center text-xs text-[#5A6E85] dark:text-slate-400">
+                    <RefreshCw size={18} className="animate-spin mx-auto mb-2 text-red-500" />
                     <span>Mencari spot terdekat via Google Places API...</span>
                   </div>
                 ) : spotsList.length === 0 ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
+                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-6 text-center text-xs text-[#5A6E85] dark:text-slate-400">
                     {userLocation ? 'Tidak ada spot ditemukan. Coba kategori lain.' : 'Tekan GPS Saya untuk mencari spot di sekitar Anda.'}
                   </div>
                 ) : (
                   spotsList.map(s => (
-                    <div key={s.id} className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
+                    <div key={s.id} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3.5 shadow-sm space-y-3">
                       <div className="flex gap-3">
-                        <div className="w-16 h-16 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
                           {s.photoUrl ? (
                             <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
                           ) : (
@@ -2178,21 +2245,21 @@ export default function App() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1.5">
-                            <div className="text-sm font-bold text-slate-900 truncate">{s.name}</div>
+                            <div className="text-sm font-bold text-[#0A1937] dark:text-white truncate font-heading">{s.name}</div>
                             {s.openNow !== null && s.openNow !== undefined && (
                               <span className={`shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border ${
                                 s.openNow
-                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                  : 'bg-rose-50 text-rose-600 border-rose-200'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                               }`}>
                                 {s.openNow ? '🟢 Buka' : '🔴 Tutup'}
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{s.desc}</div>
+                          <div className="text-xs text-[#5A6E85] dark:text-slate-400 mt-0.5 line-clamp-1">{s.desc}</div>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100">{s.rating}</span>
-                            <span className="text-[11px] text-slate-500 font-medium">
+                            <span className="px-2 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold rounded border border-red-500/20">{s.rating}</span>
+                            <span className="text-[11px] text-[#5A6E85] dark:text-slate-400 font-medium">
                               💬 {(s.userRatingCount || (s.reviews ? s.reviews.length : 0)).toLocaleString('id-ID')} ulasan
                             </span>
                             <span className="text-xs font-medium text-slate-400">📍 {s.dist}</span>
@@ -2200,13 +2267,13 @@ export default function App() {
                         </div>
                       </div>
                       {s.reviews && s.reviews.length > 0 && (
-                        <div className="bg-slate-50/80 border border-slate-100 rounded-xl p-2.5 space-y-1.5 text-xs">
-                          <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                        <div className="bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <div className="text-[11px] font-bold text-[#5A6E85] dark:text-slate-400 flex items-center gap-1">
                             💬 Top 3 Komentar:
                           </div>
                           {s.reviews.slice(0, 3).map((rev, idx) => (
-                            <div key={idx} className="text-slate-600 text-[11px] leading-snug">
-                              <span className="font-semibold text-slate-800">{rev.author || 'Pengunjung'}:</span> "{rev.text}"
+                            <div key={idx} className="text-[#0A1937] dark:text-slate-300 text-[11px] leading-snug">
+                              <span className="font-semibold text-red-600 dark:text-red-400">{rev.author || 'Pengunjung'}:</span> "{rev.text}"
                             </div>
                           ))}
                         </div>
@@ -2215,7 +2282,7 @@ export default function App() {
                         href={s.mapsUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="w-full py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-100 transition"
+                        className="w-full py-2 bg-slate-100/70 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-white/15 transition"
                       >
                         <span>Buka Rute Google Maps</span>
                         <ExternalLink size={12} />
@@ -2349,64 +2416,83 @@ export default function App() {
                         <div className="text-center py-8 text-xs text-slate-400">Belum ada riwayat scan tersimpan.</div>
                       ) : (
                         allScanHistoryList.map((item, idx) => (
-                          <div key={item.id || idx} className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-2xs gap-3">
+                          <div key={item.id || idx} className="bg-white border border-slate-200/80 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-slate-300 transition">
                             {item.image_url ? (
                               <img 
                                 src={item.image_url} 
                                 alt={item.product_name} 
                                 onClick={() => setPreviewImageUrl(item.image_url)}
-                                className="w-14 h-14 rounded-lg object-cover shrink-0 border border-slate-200 cursor-pointer hover:opacity-85 transition hover:scale-105" 
+                                className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100 cursor-pointer hover:opacity-90 transition hover:scale-102" 
                                 title="Klik untuk memperbesar gambar"
                               />
                             ) : (
-                              <div className="w-14 h-14 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-xl font-bold border border-slate-200">
+                              <div className="w-16 h-16 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60">
                                 📷
                               </div>
                             )}
-                            <div className="min-w-0 flex-1 pr-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-sm font-bold text-slate-900 truncate">{item.product_name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyHistoryTitle(item.product_name, `modal-${item.id || idx}`)}
-                                  className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
-                                  title="Salin Nama Produk"
-                                >
-                                  {copiedHistoryId === `modal-${item.id || idx}` ? (
-                                    <Check size={13} className="text-emerald-600 font-bold" />
-                                  ) : (
-                                    <Copy size={13} />
-                                  )}
-                                </button>
-                              </div>
-                              <div className="text-xs text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
-                                <span>{new Date(item.created_at).toLocaleDateString('id-ID')}</span>
-                                <span>•</span>
-                                <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
-                                {(item.location_name || item.locationName) && (
-                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
-                                    <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
-                                    📍 {item.location_name || item.locationName}
-                                  </span>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <span className="text-sm font-bold text-slate-900 truncate" title={item.product_name}>{item.product_name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyHistoryTitle(item.product_name, `modal-${item.id || idx}`)}
+                                    className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 flex items-center"
+                                    title="Salin Nama Produk"
+                                  >
+                                    {copiedHistoryId === `modal-${item.id || idx}` ? (
+                                      <Check size={14} className="text-emerald-600 font-bold" />
+                                    ) : (
+                                      <Copy size={14} />
+                                    )}
+                                  </button>
+                                </div>
+                                {item.id && (
+                                  <button
+                                    onClick={() => deleteScanHistoryItem(item.id)}
+                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition shrink-0"
+                                    title="Hapus riwayat scanner ini"
+                                    aria-label="Hapus riwayat scanner"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
                                 )}
                               </div>
-                            </div>
-                            <div className="text-right shrink-0 flex items-center gap-2">
-                              <div>
-                                <div className="text-sm font-bold text-emerald-600">
-                                  {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
+
+                              <div className="flex items-baseline justify-between gap-2 pt-0.5">
+                                <div className="text-xs text-slate-500 font-medium">
+                                  {item.price_jpy != null ? `¥${Number(item.price_jpy).toLocaleString('id-ID')}` : '-'}
                                 </div>
-                                <div className="text-[10px] text-slate-400">Estimasi Indo</div>
+                                <div className="text-right">
+                                  <div className="text-sm font-extrabold text-emerald-600 leading-tight">
+                                    {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga N/A'}
+                                  </div>
+                                  <div className="text-[10px] font-medium text-slate-400">Estimasi Indo</div>
+                                </div>
                               </div>
-                              {item.id && (
-                                <button
-                                  onClick={() => deleteScanHistoryItem(item.id)}
-                                  className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-600 flex items-center justify-center text-xs font-bold transition"
-                                  title="Hapus riwayat scan"
-                                >
-                                  ✕
-                                </button>
-                              )}
+
+                              <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400 pt-0.5">
+                                <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
+                                <div className="flex items-center gap-1.5">
+                                  {(item.location_name || item.locationName) && (
+                                    <span className="text-[10px] text-emerald-800 bg-emerald-50/80 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100">
+                                      <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
+                                      <span className="truncate max-w-[100px]">{item.location_name || item.locationName}</span>
+                                    </span>
+                                  )}
+                                  {item.latitude != null && item.longitude != null && (
+                                    <a
+                                      href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="px-2 py-0.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100"
+                                      title="Buka Lokasi Scan di Google Maps"
+                                    >
+                                      Maps ↗
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -2430,11 +2516,11 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="sticky bottom-0 left-0 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-t border-slate-200 flex items-center justify-around px-2 z-30 shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <nav className="sticky bottom-0 left-0 right-0 h-16 sm:h-20 bg-white/95 dark:bg-[#001A41]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-white/10 flex items-center justify-around px-2 z-30 shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <button 
             onClick={() => setActiveTab('valas')}
-            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
-              activeTab === 'valas' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+              activeTab === 'valas' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
             }`}
           >
             <ArrowRightLeft size={20} />
@@ -2443,8 +2529,8 @@ export default function App() {
           
           <button 
             onClick={() => setActiveTab('scanner')}
-            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
-              activeTab === 'scanner' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+              activeTab === 'scanner' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
             }`}
           >
             <Camera size={20} />
@@ -2453,8 +2539,8 @@ export default function App() {
 
           <button 
             onClick={() => setActiveTab('ngobrol')}
-            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
-              activeTab === 'ngobrol' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+              activeTab === 'ngobrol' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
             }`}
           >
             <MessageSquare size={20} />
@@ -2463,8 +2549,8 @@ export default function App() {
 
           <button 
             onClick={() => setActiveTab('kalcer')}
-            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition ${
-              activeTab === 'kalcer' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+              activeTab === 'kalcer' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
             }`}
           >
             <MapPin size={20} />

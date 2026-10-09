@@ -60,7 +60,24 @@ export function createHistoryHandler({ query = defaultQuery, authenticate = veri
         ]);
         if (!result.rowCount) return error('Riwayat tidak ditemukan', 404);
         return NextResponse.json({ success: true, item: result.rows[0] });
-      } catch { return error('Gagal memperbarui riwayat', 500); }
+      } catch (err) {
+        if (err?.message === 'DATABASE_URL wajib diatur di .env') {
+          const { inMemoryValasHistory } = await import('../route.js');
+          const idx = inMemoryValasHistory.findIndex(item => String(item.id) === String(id));
+          if (idx === -1) return error('Riwayat tidak ditemukan', 404);
+          inMemoryValasHistory[idx] = {
+            ...inMemoryValasHistory[idx],
+            from_currency: payload.from_currency,
+            to_currency: payload.to_currency,
+            from_amount: payload.from_amount,
+            to_amount: payload.to_amount,
+            exchange_rate: payload.exchange_rate,
+            note: payload.note ?? ''
+          };
+          return NextResponse.json({ success: true, item: inMemoryValasHistory[idx] });
+        }
+        return error('Gagal memperbarui riwayat', 500);
+      }
     },
 
     async DELETE(request, { params }) {
@@ -71,7 +88,16 @@ export function createHistoryHandler({ query = defaultQuery, authenticate = veri
         const result = await query('DELETE FROM conversions WHERE id = $1', [id]);
         if (!result.rowCount) return error('Riwayat tidak ditemukan', 404);
         return NextResponse.json({ success: true });
-      } catch { return error('Gagal menghapus riwayat', 500); }
+      } catch (err) {
+        if (err?.message === 'DATABASE_URL wajib diatur di .env') {
+          const { inMemoryValasHistory } = await import('../route.js');
+          const idx = inMemoryValasHistory.findIndex(item => String(item.id) === String(id));
+          if (idx === -1) return error('Riwayat tidak ditemukan', 404);
+          inMemoryValasHistory.splice(idx, 1);
+          return NextResponse.json({ success: true });
+        }
+        return error('Gagal menghapus riwayat', 500);
+      }
     },
   };
 }

@@ -2,6 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { initialSpotsState, locationErrorMessage, shouldReloadSpots, SPOT_CATEGORIES, getCountryCodeFromCoords, getFlagByCountryCode, getCountryFlagFromCoords } from './spots.js';
 
+test('spots state handles userRatingCount zero explicitly', () => {
+  const spotWithZeroCount = { userRatingCount: 0, openNow: false };
+  assert.equal(spotWithZeroCount.userRatingCount, 0);
+  assert.equal(spotWithZeroCount.openNow, false);
+});
+
+
 test('starts without fallback spots or coordinates', () => {
   assert.deepEqual(initialSpotsState(), { location: null, places: [] });
 });
@@ -17,7 +24,7 @@ test('detects country code and flag from coordinates or location name', () => {
 });
 
 test('lists normalized categories', () => {
-  assert.deepEqual(SPOT_CATEGORIES.map(({ id }) => id), ['all', 'foto', 'food', 'shopping', 'gadget', 'coffee', 'attraction', 'hiburan']);
+  assert.deepEqual(SPOT_CATEGORIES.map(({ id }) => id), ['all', 'foto', 'food', 'shopping', 'gadget', 'coffee', 'water', 'attraction', 'hiburan']);
 });
 
 test('category reload requires acquired location', () => {

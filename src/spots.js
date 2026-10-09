@@ -40,6 +40,7 @@ export const SPOT_CATEGORIES = [
   { id: 'shopping', label: '🛍️ Belanja' },
   { id: 'gadget', label: '📱 Gadget' },
   { id: 'coffee', label: '☕ Kafe' },
+  { id: 'water', label: '🚰 Air Minum' },
   { id: 'attraction', label: '🗼 Atraksi' },
   { id: 'hiburan', label: '🎭 Hiburan' },
 ];
