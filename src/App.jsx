@@ -1953,14 +1953,15 @@ export default function App() {
 
               {/* History Percakapan */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center relative z-20">
                   <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Percakapan Tersimpan ({chatHistory.length})</h2>
                   {chatHistory.length > 5 && (
                     <button
+                      type="button"
                       onClick={() => setShowAllHistoryModal(true)}
-                      className="text-xs text-red-600 dark:text-red-400 hover:underline font-bold cursor-pointer"
+                      className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-lg font-bold cursor-pointer transition flex items-center gap-1 z-20"
                     >
-                      Lihat Semua →
+                      Lihat Semua ({chatHistory.length}) →
                     </button>
                   )}
                 </div>
