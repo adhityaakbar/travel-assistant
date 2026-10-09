@@ -2,7 +2,13 @@ import './globals.css';
 
 export const metadata = {
   title: 'Travel Assistant Japan',
-  description: 'Asisten perjalanan personal untuk Jepang'
+  description: 'Asisten perjalanan personal untuk Jepang',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Travel Assistant',
+  },
 };
 
 export const viewport = {

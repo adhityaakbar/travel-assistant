@@ -5,6 +5,34 @@ export function getCountryCodeFromCoords(lat, lng) {
   return 'JPN';
 }
 
+export function getFlagByCountryCode(code) {
+  const flags = {
+    IDN: '🇮🇩',
+    JPN: '🇯🇵',
+    SGP: '🇸🇬',
+    USA: '🇺🇸',
+    KOR: '🇰🇷',
+    EUR: '🇪🇺',
+    GBR: '🇬🇧',
+    AUS: '🇦🇺',
+    CHN: '🇨🇳',
+    THA: '🇹🇭',
+    MYS: '🇲🇾',
+  };
+  return flags[code] || '🇯🇵';
+}
+
+export function getCountryFlagFromCoords(lat, lng, locationName = '') {
+  if (locationName) {
+    const locLower = String(locationName).toLowerCase();
+    if (locLower.includes('indonesia') || locLower.includes('jakarta') || locLower.includes('bali') || locLower.includes('bandung') || locLower.includes('surabaya')) return '🇮🇩';
+    if (locLower.includes('japan') || locLower.includes('jepang') || locLower.includes('tokyo') || locLower.includes('osaka') || locLower.includes('kyoto')) return '🇯🇵';
+    if (locLower.includes('singapore') || locLower.includes('singapura')) return '🇸🇬';
+  }
+  const code = getCountryCodeFromCoords(lat, lng);
+  return getFlagByCountryCode(code);
+}
+
 export const SPOT_CATEGORIES = [
   { id: 'all', label: '🔥 Semua' },
   { id: 'foto', label: '📸 Foto' },

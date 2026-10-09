@@ -25,24 +25,46 @@ import {
   BookmarkPlus,
   Pencil,
   Trash2,
-  Copy
+  Copy,
+  Smartphone,
+  Download
 } from 'lucide-react';
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
-import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCodeFromCoords } from './spots.js';
+import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCodeFromCoords, getCountryFlagFromCoords } from './spots.js';
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.4.6';
+
 export default function App() {
+  // Mount State to avoid hydration mismatch
+  const [isMounted, setIsMounted] = useState(false);
+
   // Auth State
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => typeof window === 'undefined' ? '' : localStorage.getItem('travel_assistant_token') || '');
+  const [token, setToken] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loginPasscode, setLoginPasscode] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState('valas');
+  const [activeTabState, setActiveTabState] = useState('valas');
+  const activeTab = activeTabState;
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('travel_assistant_active_tab', tab);
+    }
+  };
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [showPwaInstallModal, setShowPwaInstallModal] = useState(false);
   
   // Valas State
   const [ratesData, setRatesData] = useState({ IDR: 0, ...Object.fromEntries(CURRENCIES.map(currency => [currency, currency === 'JPY' ? 1 : 0])) });
@@ -140,30 +162,88 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState([]);
   const [showAllHistoryModal, setShowAllHistoryModal] = useState(false);
 
+  // PWA Install prompt listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isIosDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
+    setIsIos(isIosDevice);
+
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstallable(false);
+        setDeferredPrompt(null);
+      }
+    } else {
+      setShowPwaInstallModal(true);
+    }
+  };
+
+  // Hydrate client storage after initial render to avoid SSR hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem('travel_assistant_token') || sessionStorage.getItem('travel_assistant_token') || '';
+      const storedRemember = localStorage.getItem('travel_assistant_remember_me') !== 'false';
+      const storedPasscode = localStorage.getItem('travel_assistant_passcode') || '';
+      const storedTab = localStorage.getItem('travel_assistant_active_tab') || 'valas';
+
+      setToken(storedToken);
+      setRememberMe(storedRemember);
+      setLoginPasscode(storedPasscode);
+      setActiveTabState(storedTab);
+      setIsCheckingAuth(Boolean(storedToken));
+    } else {
+      setIsCheckingAuth(false);
+    }
+  }, []);
+
   // 1. Initial Load: Auth Token & Initial Data
   useEffect(() => {
-    if (token) {
+    if (!isMounted) return;
+    const currentToken = getAuthToken();
+    if (currentToken) {
       if (!userLocation) {
         requestUserLocation();
       } else {
         setLocationStatus(`📍 GPS: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`);
         setCountryCode(getCountryCodeFromCoords(userLocation.lat, userLocation.lng));
       }
-      axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+      axios.get('/api/auth/me', { headers: { Authorization: `Bearer ${currentToken}` } })
         .then(res => {
           setUser(res.data.user);
         })
         .catch(() => {
           localStorage.removeItem('travel_assistant_token');
+          sessionStorage.removeItem('travel_assistant_token');
           setToken('');
           setUser(null);
+        })
+        .finally(() => {
+          setIsCheckingAuth(false);
         });
+    } else {
+      setIsCheckingAuth(false);
     }
     loadLiveRates();
     loadConversionHistory();
     loadScanHistory();
     loadChatHistory();
-  }, [token]);
+  }, [token, isMounted]);
 
   // Handle Login
   const handleLogin = async (e) => {
@@ -177,13 +257,24 @@ export default function App() {
       });
 
       if (res.data.success) {
-        localStorage.setItem('travel_assistant_token', res.data.token);
-        setToken(res.data.token);
+        const newToken = res.data.token;
+        if (rememberMe) {
+          localStorage.setItem('travel_assistant_token', newToken);
+          localStorage.setItem('travel_assistant_passcode', loginPasscode);
+          localStorage.setItem('travel_assistant_remember_me', 'true');
+          sessionStorage.removeItem('travel_assistant_token');
+        } else {
+          sessionStorage.setItem('travel_assistant_token', newToken);
+          localStorage.setItem('travel_assistant_remember_me', 'false');
+          localStorage.removeItem('travel_assistant_token');
+          localStorage.removeItem('travel_assistant_passcode');
+        }
+        setToken(newToken);
         setUser(res.data.user);
         requestUserLocation();
-        loadScanHistory();
-        loadChatHistory();
-        loadConversionHistory();
+        loadScanHistory(newToken);
+        loadChatHistory(newToken);
+        loadConversionHistory(newToken);
       }
     } catch (err) {
       setLoginError(err.response?.data?.error || 'Gagal login. Pastikan passcode benar.');
@@ -194,6 +285,10 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('travel_assistant_token');
+    sessionStorage.removeItem('travel_assistant_token');
+    if (!rememberMe) {
+      localStorage.removeItem('travel_assistant_passcode');
+    }
     setToken('');
     setUser(null);
     setScanHistoryList([]);
@@ -220,9 +315,11 @@ export default function App() {
     }
   };
 
-  const loadConversionHistory = async () => {
+  const loadConversionHistory = async (overrideToken = null) => {
+    const authToken = overrideToken || getAuthToken();
+    if (!authToken) return;
     try {
-      const res = await axios.get('/api/valas/history', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get('/api/valas/history', { headers: { Authorization: `Bearer ${authToken}` } });
       if (res.data && res.data.history) {
         setConversionHistory(res.data.history);
       }
@@ -261,6 +358,7 @@ export default function App() {
     }
     setConversionError('');
     setSavingConversion(true);
+    const authToken = getAuthToken();
     try {
       await axios.post('/api/valas/history', {
         from_currency: activeChip,
@@ -269,7 +367,7 @@ export default function App() {
         to_amount: idrAmount,
         exchange_rate: Number(ratesData.IDR) / (Number(ratesData[activeChip]) || 1),
         note: conversionNote
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} });
       loadConversionHistory();
     } catch (err) {
       alert('Gagal menyimpan riwayat: ' + err.message);
@@ -279,9 +377,10 @@ export default function App() {
   };
 
   const updateConversion = async (item) => {
+    const authToken = getAuthToken();
     try {
       await axios.patch(`/api/valas/history/${item.id}`, formatHistoryPayload(item), {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
       setEditingConversion(null);
       await loadConversionHistory();
@@ -292,8 +391,9 @@ export default function App() {
 
   const deleteConversion = async (id) => {
     if (!window.confirm('Hapus riwayat konversi ini?')) return;
+    const authToken = getAuthToken();
     try {
-      await axios.delete(`/api/valas/history/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`/api/valas/history/${id}`, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} });
       await loadConversionHistory();
     } catch (err) {
       alert('Gagal menghapus riwayat: ' + (err.response?.data?.error || err.message));
@@ -503,7 +603,7 @@ export default function App() {
     }
   };
 
-  const getAuthToken = () => token || (typeof window !== 'undefined' ? localStorage.getItem('travel_assistant_token') || '' : '');
+  const getAuthToken = () => token || (typeof window !== 'undefined' ? (localStorage.getItem('travel_assistant_token') || sessionStorage.getItem('travel_assistant_token') || '') : '');
 
   const saveScannedResultToHistory = async () => {
     if (!scannedResult || scanSaving) return;
@@ -530,8 +630,8 @@ export default function App() {
     }
   };
 
-  const loadScanHistory = async () => {
-    const authToken = getAuthToken();
+  const loadScanHistory = async (overrideToken = null) => {
+    const authToken = overrideToken || getAuthToken();
     if (!authToken) return;
     try {
       const res = await axios.get('/api/scanner/history?limit=15', {
@@ -552,8 +652,8 @@ export default function App() {
     setTimeout(() => setCopiedHistoryId(null), 2000);
   };
 
-  const loadAllScanHistory = async () => {
-    const authToken = getAuthToken();
+  const loadAllScanHistory = async (overrideToken = null) => {
+    const authToken = overrideToken || getAuthToken();
     if (!authToken) return;
     try {
       const res = await axios.get('/api/scanner/history?all=true', {
@@ -568,11 +668,14 @@ export default function App() {
     }
   };
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = async (overrideToken = null) => {
+    const authToken = overrideToken || getAuthToken();
+    if (!authToken) return;
     setChatHistoryLoading(true);
     try {
-      const res = await axios.get('/api/chat/history', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.get('/api/chat/history', { headers: { Authorization: `Bearer ${authToken}` } });
       setChatHistory(res.data.history || []);
+      setChatError('');
     } catch (err) {
       setChatError(err.response?.data?.error || 'Riwayat percakapan gagal dimuat.');
     } finally {
@@ -608,8 +711,11 @@ export default function App() {
 
     const requestId = ++translationRequestIdRef.current;
     const request = { text: textToTranslate.trim(), source_language: sourceLanguage, target_language: currentTarget };
+    const authToken = getAuthToken();
     try {
-      const res = await axios.post('/api/chat/translate', request, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post('/api/chat/translate', request, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       if (!applyLatestTranslationState(requestId, translationRequestIdRef.current, () => {
         const translation = res.data.translation || '';
         setTranslatedText(translation);
@@ -665,9 +771,10 @@ export default function App() {
 
     if (!payload || !payload.sourceText || !payload.translatedText) return;
     setChatSaving(true);
+    const authToken = getAuthToken();
     try {
       await axios.post('/api/chat/history', conversationPayload(payload), {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
       });
       await loadChatHistory();
       setChatError('');
@@ -680,8 +787,11 @@ export default function App() {
 
   const deleteChat = async (id) => {
     if (!window.confirm('Hapus percakapan ini?')) return;
+    const authToken = getAuthToken();
     try {
-      await axios.delete(`/api/chat/history/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`/api/chat/history/${id}`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       await loadChatHistory();
     } catch (err) {
       setChatError(err.response?.data?.error || 'Percakapan gagal dihapus.');
@@ -690,8 +800,11 @@ export default function App() {
 
   const deleteScanHistoryItem = async (id) => {
     if (!window.confirm('Hapus riwayat scanner ini?')) return;
+    const authToken = getAuthToken();
     try {
-      await axios.delete(`/api/scanner/history/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.delete(`/api/scanner/history/${id}`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       await loadScanHistory();
     } catch (err) {
       console.warn('Gagal menghapus scan history:', err);
@@ -888,6 +1001,23 @@ export default function App() {
   };
 
   // ==========================================
+  // RENDER: AUTH CHECKING & MOUNT LOADER
+  // ==========================================
+  if (!isMounted || isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-8 shadow-xl flex flex-col items-center justify-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shadow-xs animate-bounce">
+            <Compass size={32} className="animate-spin" />
+          </div>
+          <div className="text-base font-bold font-heading text-slate-800">Memverifikasi Sesi Login...</div>
+          <p className="text-xs text-slate-400">Harap tunggu sebentar</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
   // RENDER: LOGIN SCREEN (If not authenticated)
   // ==========================================
   if (!user) {
@@ -924,6 +1054,24 @@ export default function App() {
               </div>
             </div>
 
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberMe(checked);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('travel_assistant_remember_me', checked ? 'true' : 'false');
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <span>Ingat Saya (Remember Me)</span>
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={loginLoading}
@@ -946,7 +1094,7 @@ export default function App() {
           {/* Version Tracking Footer */}
           <div className="pt-2 text-center border-t border-slate-100">
             <span className="text-[10px] font-mono text-slate-400">
-              Build Version: {process.env.NEXT_PUBLIC_APP_VERSION || 'v1.2.0'}
+              Build Version: {APP_VERSION}
             </span>
           </div>
 
@@ -972,10 +1120,20 @@ export default function App() {
               <span className="text-xl font-extrabold font-heading text-slate-900 tracking-tight">Travel Assistant</span>
               <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-600 rounded-full border border-blue-200">{countryCode}</span>
             </div>
-            <div className="text-[10px] text-slate-400 font-mono font-medium -mt-0.5">v1.4.0</div>
+            <div className="text-[10px] text-slate-400 font-mono font-medium -mt-0.5">{APP_VERSION}</div>
           </div>
           
           <div className="flex items-center gap-1.5">
+            <button 
+              onClick={handleInstallPwa}
+              title="Pasang PWA / Aplikasi"
+              className="w-9 h-9 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-600 transition relative"
+            >
+              <Smartphone size={16} />
+              {isInstallable && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-white animate-pulse" />
+              )}
+            </button>
             <button 
               onClick={handleLogout}
               title="Keluar / Logout"
@@ -1310,6 +1468,7 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     {scannedResult.location_name && (
                       <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md font-medium">
+                        <span className="text-xs">{getCountryFlagFromCoords(scannedResult.latitude, scannedResult.longitude, scannedResult.location_name)}</span>
                         <MapPin size={12} className="text-emerald-600" />
                         <span>{scannedResult.location_name}</span>
                       </div>
@@ -1455,7 +1614,8 @@ export default function App() {
                             <span>•</span>
                             <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
                             {(item.location_name || item.locationName) && (
-                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">
+                              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                                <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
                                 📍 {item.location_name || item.locationName}
                               </span>
                             )}
@@ -2017,13 +2177,24 @@ export default function App() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-slate-900 truncate">{s.name}</div>
-                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{s.desc}</div>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100">{s.rating}</span>
-                            {s.userRatingCount > 0 && (
-                              <span className="text-[11px] text-slate-500 font-medium">({s.userRatingCount.toLocaleString('id-ID')} ulasan)</span>
+                          <div className="flex items-center justify-between gap-1.5">
+                            <div className="text-sm font-bold text-slate-900 truncate">{s.name}</div>
+                            {s.openNow !== null && s.openNow !== undefined && (
+                              <span className={`shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                                s.openNow
+                                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                  : 'bg-rose-50 text-rose-600 border-rose-200'
+                              }`}>
+                                {s.openNow ? '🟢 Buka' : '🔴 Tutup'}
+                              </span>
                             )}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{s.desc}</div>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-bold rounded border border-blue-100">{s.rating}</span>
+                            <span className="text-[11px] text-slate-500 font-medium">
+                              💬 {(s.userRatingCount || (s.reviews ? s.reviews.length : 0)).toLocaleString('id-ID')} ulasan
+                            </span>
                             <span className="text-xs font-medium text-slate-400">📍 {s.dist}</span>
                           </div>
                         </div>
@@ -2213,7 +2384,8 @@ export default function App() {
                                 <span>•</span>
                                 <span>¥{Number(item.price_jpy).toLocaleString('id-ID')}</span>
                                 {(item.location_name || item.locationName) && (
-                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold">
+                                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold flex items-center gap-1">
+                                    <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
                                     📍 {item.location_name || item.locationName}
                                   </span>
                                 )}
@@ -2323,6 +2495,55 @@ export default function App() {
                 alt="Pratinjau Hasil Scan" 
                 className="w-full max-h-[75vh] object-contain rounded-xl shadow-lg"
               />
+            </div>
+          </div>
+        )}
+
+        {/* Modal PWA Install Guide */}
+        {showPwaInstallModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="text-blue-600" size={20} />
+                  <h3 className="text-sm font-bold text-slate-900">Pasang Travel Assistant</h3>
+                </div>
+                <button onClick={() => setShowPwaInstallModal(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              </div>
+              
+              <div className="space-y-3 text-xs text-slate-600">
+                {isInstallable ? (
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded-xl font-medium">
+                    Klik tombol di bawah untuk memasang aplikasi ke layar utama perangkat Anda.
+                  </div>
+                ) : isIos ? (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-slate-800">Cara pasang di iPhone / iPad (Safari):</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                      <li>Buka menu <span className="font-bold">Share (Bagikan)</span> 📤 di Safari.</li>
+                      <li>Pilih <span className="font-bold">"Tambah ke Layar Utama" (Add to Home Screen)</span> ➕.</li>
+                      <li>Tekan <span className="font-bold">Tambah</span>.</li>
+                    </ol>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="font-semibold text-slate-800">Cara pasang di Android / Chrome:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-600">
+                      <li>Buka menu tiga titik (⋮) di pojok kanan atas browser.</li>
+                      <li>Pilih <span className="font-bold">"Instal aplikasi"</span> atau <span className="font-bold">"Tambahkan ke Layar Utama"</span>.</li>
+                    </ol>
+                  </div>
+                )}
+              </div>
+
+              {isInstallable && (
+                <button
+                  onClick={handleInstallPwa}
+                  className="w-full py-2.5 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 transition"
+                >
+                  Pasang Sekarang
+                </button>
+              )}
             </div>
           </div>
         )}
