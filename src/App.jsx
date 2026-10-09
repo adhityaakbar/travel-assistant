@@ -844,6 +844,9 @@ export default function App() {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
       });
       await loadScanHistory();
+      if (showAllScanHistoryModal) {
+        await loadAllScanHistory();
+      }
     } catch (err) {
       console.warn('Gagal menghapus scan history:', err);
     }
