@@ -1511,7 +1511,7 @@ export default function App() {
                                     fill={dotColor}
                                     className="transition-all duration-150"
                                   />
-                                  {isLast && (
+                                  {isLast && !isHovered && (
                                     <circle cx={pt.x} cy={pt.y} r="7" fill={strokeColor} fillOpacity="0.3" className="animate-ping pointer-events-none" />
                                   )}
                                 </g>
