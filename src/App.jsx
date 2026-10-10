@@ -1515,7 +1515,15 @@ export default function App() {
                     )}
 
                     {/* Top Control Bar for Captured View */}
-                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/70 to-transparent flex justify-end text-white">
+                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/70 to-transparent flex items-center justify-end gap-2 text-white">
+                      <a
+                        href={capturedImage}
+                        download="scan-captured-image.jpg"
+                        title="Download Foto"
+                        className="p-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-xs text-white rounded-full transition flex items-center justify-center cursor-pointer"
+                      >
+                        <Download size={14} />
+                      </a>
                       <button 
                         onClick={() => { setCapturedImage(null); startCamera(); }}
                         className="px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-xs text-white text-xs font-bold rounded-full transition flex items-center gap-1 cursor-pointer"
