@@ -98,6 +98,7 @@ export default function App() {
   const [sourceAmount, setSourceAmount] = useState(0);
   const [idrAmount, setIdrAmount] = useState(0);
   const [activeChip, setActiveChip] = useState('JPY');
+  const [valasTimeframe, setValasTimeframe] = useState('7D');
   const [conversionNote, setConversionNote] = useState('');
   const [conversionHistory, setConversionHistory] = useState([]);
   const [conversionError, setConversionError] = useState('');
@@ -160,6 +161,9 @@ export default function App() {
   const DEFAULT_JAKSEL_LOCATION = { lat: -6.2615, lng: 106.8106 }; // Jakarta Selatan
 
   // Spot Kalcer State
+  const [activeValasTimeframe, setActiveValasTimeframe] = useState('7D');
+  const [valasChartData, setValasChartData] = useState(null);
+  const [valasChartLoading, setValasChartLoading] = useState(false);
   const [userLocation, setUserLocation] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('travel_assistant_user_location');
@@ -339,6 +343,27 @@ export default function App() {
     setConversionHistory([]);
     stopCamera();
   };
+
+  // Fetch Valas Chart Data
+  const loadValasChart = async (curr = activeChip, tf = activeValasTimeframe) => {
+    setValasChartLoading(true);
+    try {
+      const res = await axios.get(`/api/valas/history-chart?currency=${curr}&timeframe=${tf}`);
+      if (res.data && res.data.success) {
+        setValasChartData(res.data);
+      }
+    } catch (err) {
+      console.warn('Chart fetch error:', err);
+    } finally {
+      setValasChartLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'valas') {
+      loadValasChart(activeChip, activeValasTimeframe);
+    }
+  }, [activeChip, activeValasTimeframe, activeTab]);
 
   // 2. Valas API Integration
   const loadLiveRates = async () => {
@@ -1352,8 +1377,110 @@ export default function App() {
                 </button>
               </div>
 
-              {/* Preset Currency Chips (Horizontal Swipe - Perfectly Aligned) */}
-              <div className="py-1">
+              {/* Presets & Cards */}
+              <div className="py-1 space-y-3">
+                {/* Valas Mini Sparkline Chart */}
+                <div className="bg-white dark:bg-[#0D1627] border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-[#0A1937] dark:text-white">{activeChip} / IDR</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded font-semibold">{activeValasTimeframe}</span>
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">Trend Rate Valas</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white font-mono">
+                        {valasChartData?.endRate ? `Rp ${valasChartData.endRate.toLocaleString('id-ID', { minimumFractionDigits: 2 })}` : ratesData.IDR && ratesData[activeChip] ? `Rp ${(ratesData.IDR / ratesData[activeChip]).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                      </div>
+                      <div className={`text-[11px] font-bold font-mono flex items-center justify-end gap-0.5 ${valasChartData?.changePct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                        <span>{valasChartData?.changePct >= 0 ? '▲' : '▼'}</span>
+                        {valasChartData ? `${valasChartData.changePct > 0 ? '+' : ''}${valasChartData.changePct}%` : '...'}
+                        <span className="text-[9px] text-slate-400 font-normal">({activeValasTimeframe})</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeframe Selector Pills */}
+                  <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                    {['7D', '14D', '30D', '6M', '1Y', '2Y'].map((tf) => (
+                      <button
+                        key={tf}
+                        onClick={() => setActiveValasTimeframe(tf)}
+                        className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                          activeValasTimeframe === tf
+                            ? 'bg-[#FF0025] text-white shadow-xs shadow-red-500/30'
+                            : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {tf}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* SVG Mini Chart Line */}
+                  <div className="pt-1 relative">
+                    {valasChartLoading && (
+                      <div className="absolute inset-0 bg-white/50 dark:bg-black/40 backdrop-blur-[1px] flex items-center justify-center text-xs font-mono text-slate-400 z-10 rounded-lg">
+                        Loading chart...
+                      </div>
+                    )}
+                    {(() => {
+                      const points = valasChartData?.chartPoints || [];
+                      const isPos = (valasChartData?.changePct || 0) >= 0;
+                      const strokeColor = isPos ? '#22c55e' : '#ef4444';
+                      const gradId = `valasGrad_${activeChip}_${activeValasTimeframe}`;
+                      
+                      if (points.length < 2) {
+                        return (
+                          <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
+                            <line x1="0" y1="30" x2="300" y2="30" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                          </svg>
+                        );
+                      }
+
+                      const ratesArr = points.map(p => p.rate);
+                      const min = Math.min(...ratesArr);
+                      const max = Math.max(...ratesArr);
+                      const range = max - min || 1;
+
+                      // Map points to SVG viewBox 300x50 with padding 5 top/bottom
+                      const svgPoints = points.map((p, idx) => {
+                        const x = (idx / (points.length - 1)) * 300;
+                        const y = 50 - ((p.rate - min) / range) * 40 + 5;
+                        return { x, y };
+                      });
+
+                      const pathD = svgPoints.reduce((acc, pt, idx) => {
+                        return idx === 0 ? `M ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}` : `${acc} L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
+                      }, '');
+
+                      const areaD = `${pathD} L 300 60 L 0 60 Z`;
+                      const lastPt = svgPoints[svgPoints.length - 1];
+
+                      return (
+                        <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
+                          <defs>
+                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3"/>
+                              <stop offset="100%" stopColor={strokeColor} stopOpacity="0"/>
+                            </linearGradient>
+                          </defs>
+                          <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                          <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                          <path d={areaD} fill={`url(#${gradId})`} />
+                          <path d={pathD} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx={lastPt.x} cy={lastPt.y} r="3.5" fill={strokeColor} />
+                          <circle cx={lastPt.x} cy={lastPt.y} r="6.5" fill={strokeColor} fillOpacity="0.3" className="animate-ping" />
+                        </svg>
+                      );
+                    })()}
+                  </div>
+                </div>
+
                 <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory py-1 px-0 no-scrollbar">
                   {CURRENCIES.map(curr => {
                     const rateText = formatChipRate(ratesData, curr);
