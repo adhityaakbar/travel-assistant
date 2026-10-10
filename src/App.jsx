@@ -41,7 +41,9 @@ import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCod
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.5.3';
+import pkg from '../package.json';
+
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || `v${pkg.version}`;
 
 export default function App() {
   // Mount State to avoid hydration mismatch
@@ -1211,7 +1213,7 @@ export default function App() {
 
           {/* Version Tracking Footer */}
           <div className="pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-center text-[11px] text-[#5A6E85] dark:text-slate-400">
-            <span className="font-mono">v1.5.3</span>
+            <span className="font-mono">{APP_VERSION}</span>
           </div>
 
         </div>
