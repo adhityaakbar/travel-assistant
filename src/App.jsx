@@ -1492,9 +1492,11 @@ export default function App() {
                               const isLast = idx === svgPoints.length - 1;
                               const dotColor = isFirst ? '#FDA22B' : strokeColor;
 
-                              // Pin label position relative to dot inside SVG
-                              const tooltipX = pt.x - 38; // Center 76px wide tooltip exactly over dot
-                              const tooltipY = pt.y - 24; // Position 24px above dot
+                              // Dynamic tooltip width calculation for true SVG centering
+                              const rateText = `Rp ${pt.rate.toLocaleString('id-ID')}`;
+                              const textWidth = rateText.length * 6 + 12; // 6px per char + 12px padding
+                              const tooltipX = Math.max(2, Math.min(300 - textWidth - 2, pt.x - textWidth / 2));
+                              const tooltipY = Math.max(2, pt.y - 26);
 
                               return (
                                 <g key={pt.date} className="cursor-pointer" onMouseEnter={() => setValasHoverPoint(pt)}>
@@ -1511,9 +1513,9 @@ export default function App() {
                                   {/* Direct SVG pinned tooltip on hover centered above dot */}
                                   {isHovered && (
                                     <g transform={`translate(${tooltipX}, ${tooltipY})`} className="pointer-events-none z-30">
-                                      <rect x="0" y="0" width="76" height="20" rx="4" fill="#0f172a" fillOpacity="0.95" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
-                                      <text x="38" y="13" textAnchor="middle" fill="#22c55e" fontSize="9" fontWeight="bold" fontFamily="monospace">
-                                        Rp {pt.rate.toLocaleString('id-ID')}
+                                      <rect x="0" y="0" width={textWidth} height="20" rx="4" fill="#060B14" fillOpacity="0.95" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8" />
+                                      <text x={textWidth / 2} y="13" textAnchor="middle" fill="#22c55e" fontSize="9.5" fontWeight="bold" fontFamily="monospace">
+                                        {rateText}
                                       </text>
                                     </g>
                                   )}
