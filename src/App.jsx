@@ -1493,9 +1493,8 @@ export default function App() {
                               const dotColor = isFirst ? '#FDA22B' : strokeColor;
 
                               // Pin label position relative to dot inside SVG
-                              const isNearRight = pt.x > 200;
-                              const tooltipX = isNearRight ? pt.x - 70 : pt.x + 8;
-                              const tooltipY = Math.max(12, pt.y - 12);
+                              const tooltipX = pt.x - 38; // Center 76px wide tooltip exactly over dot
+                              const tooltipY = pt.y - 24; // Position 24px above dot
 
                               return (
                                 <g key={pt.date} className="cursor-pointer" onMouseEnter={() => setValasHoverPoint(pt)}>
@@ -1509,10 +1508,10 @@ export default function App() {
                                     fill={dotColor}
                                     pointerEvents="none"
                                   />
-                                  {/* Direct SVG pinned tooltip on hover */}
+                                  {/* Direct SVG pinned tooltip on hover centered above dot */}
                                   {isHovered && (
-                                    <g transform={`translate(${tooltipX}, ${tooltipY})`} className="pointer-events-none">
-                                      <rect x="0" y="0" width="76" height="20" rx="4" fill="#0f172a" fillOpacity="0.9" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                    <g transform={`translate(${tooltipX}, ${tooltipY})`} className="pointer-events-none z-30">
+                                      <rect x="0" y="0" width="76" height="20" rx="4" fill="#0f172a" fillOpacity="0.95" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
                                       <text x="38" y="13" textAnchor="middle" fill="#22c55e" fontSize="9" fontWeight="bold" fontFamily="monospace">
                                         Rp {pt.rate.toLocaleString('id-ID')}
                                       </text>
