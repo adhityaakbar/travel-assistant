@@ -1641,21 +1641,6 @@ export default function App() {
                     </a>
                   </div>
 
-                  {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      {scannedResult.tokopedia_url && (
-                        <a href={scannedResult.tokopedia_url} target="_blank" rel="noopener noreferrer" className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition">
-                          <span>🛍️</span> Tokopedia ↗
-                        </a>
-                      )}
-                      {scannedResult.shopee_url && (
-                        <a href={scannedResult.shopee_url} target="_blank" rel="noopener noreferrer" className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition">
-                          <span>🛒</span> Shopee ↗
-                        </a>
-                      )}
-                    </div>
-                  )}
-
                   <button
                     onClick={saveScannedResultToHistory}
                     disabled={scannedResultSaved || scanSaving}
@@ -1681,6 +1666,44 @@ export default function App() {
                       </>
                     )}
                   </button>
+
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
+                    <div>
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {scannedResult.lowest_price_idr != null ? `Rp ${Number(scannedResult.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">HARGA JEPANG · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white mt-0.5">
+                        {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
+                      </div>
+                    </div>
+                    <div className="col-span-2 pt-2 border-t border-slate-200/80 dark:border-white/10">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">RATA-RATA INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-bold text-[#0A1937] dark:text-slate-200">
+                        {scannedResult.average_price_idr != null ? `Rp ${Number(scannedResult.average_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {scannedResult.estimate_note && <p className="text-xs text-[#5A6E85] dark:text-slate-400">{scannedResult.estimate_note}</p>}
+
+                  {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {scannedResult.tokopedia_url && (
+                        <a href={scannedResult.tokopedia_url} target="_blank" rel="noopener noreferrer" className="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition">
+                          <span>🛍️</span> Tokopedia ↗
+                        </a>
+                      )}
+                      {scannedResult.shopee_url && (
+                        <a href={scannedResult.shopee_url} target="_blank" rel="noopener noreferrer" className="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition">
+                          <span>🛒</span> Shopee ↗
+                        </a>
+                      )}
+                    </div>
+                  )}
 
                   {/* Feedback Correction Input (Collapsible) - Moved to bottom */}
                   <div className="space-y-2 pt-1 border-t border-slate-200/60 dark:border-white/10">
@@ -1742,29 +1765,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
-                    <div>
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                        {scannedResult.lowest_price_idr != null ? `Rp ${Number(scannedResult.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">HARGA JEPANG · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white mt-0.5">
-                        {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
-                      </div>
-                    </div>
-                    <div className="col-span-2 pt-2 border-t border-slate-200/80 dark:border-white/10">
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">RATA-RATA INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-bold text-[#0A1937] dark:text-slate-200">
-                        {scannedResult.average_price_idr != null ? `Rp ${Number(scannedResult.average_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {scannedResult.estimate_note && <p className="text-xs text-[#5A6E85] dark:text-slate-400">{scannedResult.estimate_note}</p>}
 
                   {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
                     <div className="grid grid-cols-2 gap-2">
