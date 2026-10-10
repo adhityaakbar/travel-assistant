@@ -9,34 +9,47 @@
   - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 1066ms
+ ✓ Ready in 1065ms
+ ✓ Compiled /api/auth/login in 233ms (137 modules)
+ POST /api/auth/login 200 in 285ms
+ ✓ Compiled /api/valas/history in 25ms (144 modules)
+ ✓ Compiled (151 modules)
+ GET /api/chat/history 200 in 114ms
+ GET /api/valas/history 200 in 115ms
+ ✓ Compiled /api/valas/rates in 33ms (153 modules)
+ GET /api/scanner/history?limit=15 200 in 228ms
+ ✓ Compiled in 0ms (294 modules)
+ ✓ Compiled in 0ms (294 modules)
+ ✓ Compiled in 0ms (294 modules)
+ GET /api/auth/me 200 in 298ms
+ GET /api/valas/history 200 in 363ms
+ GET /api/chat/history 200 in 307ms
+ GET /api/scanner/history?limit=15 200 in 334ms
+ GET /api/valas/rates 200 in 731ms
+ ✓ Compiled /api/places/nearby in 136ms (297 modules)
+ GET /api/places/nearby?lat=-6.245343387217728&lng=106.852273758973&category=all 200 in 245ms
+ GET /api/places/nearby?lat=-6.245343387217728&lng=106.852273758973&category=all 200 in 26ms
+ GET /api/scanner/history?limit=15 200 in 81ms
+ GET /api/scanner/history?all=true 500 in 12ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1750ms (729 modules)
+ GET /_next/static/css/app/layout.css?v=1791592431699 404 in 1826ms
  ○ Compiling / ...
- ✓ Compiled / in 3s (765 modules)
- GET / 200 in 3189ms
- ○ Compiling /api/valas/rates ...
- ✓ Compiled /api/valas/rates in 1348ms (528 modules)
- ✓ Compiled (670 modules)
- GET /api/auth/me 200 in 4080ms
- GET /api/valas/history 200 in 4138ms
- GET /api/chat/history 200 in 4146ms
- GET /api/scanner/history?limit=15 200 in 4189ms
- GET /api/valas/rates 200 in 4543ms
- GET /api/scanner/history?all=true 500 in 22ms
- GET /api/chat/history 200 in 113ms
- GET /api/scanner/history?limit=15 200 in 71ms
- GET /api/scanner/history?all=true 500 in 14ms
- ✓ Compiled /api/places/nearby in 209ms (673 modules)
- GET /api/places/nearby?lat=-6.245371772933977&lng=106.85229574938654&category=all 200 in 356ms
- GET /api/scanner/history?limit=15 200 in 153ms
- GET /api/scanner/history?all=true 500 in 11ms
- GET /api/scanner/history?all=true 500 in 10ms
- GET /api/scanner/history?all=true 500 in 10ms
- GET /api/scanner/history?all=true 500 in 9ms
- GET /api/scanner/history?all=true 500 in 10ms
- GET /api/chat/history 200 in 58ms
- GET /api/scanner/history?limit=15 200 in 136ms
- GET /api/scanner/history?limit=15 200 in 132ms
- GET /api/scanner/history?all=true 500 in 13ms
- ✓ Compiled in 703ms (765 modules)
- ✓ Compiled in 68ms (345 modules)
-[?25h
+ ✓ Compiled / in 858ms (1023 modules)
+ GET / 200 in 1063ms
+ GET /api/auth/me 200 in 190ms
+ GET /api/valas/history 200 in 391ms
+ GET /api/chat/history 200 in 406ms
+ GET /api/scanner/history?limit=15 200 in 429ms
+ GET /api/scanner/history?limit=15 200 in 1054ms
+ GET /api/valas/rates 200 in 1488ms
+ ✓ Compiled in 566ms (765 modules)
+ ✓ Compiled in 3.4s (765 modules)
+ ✓ Compiled in 453ms (345 modules)
+ ✓ Compiled in 684ms (765 modules)
+ ✓ Compiled in 652ms (765 modules)
+ ✓ Compiled in 582ms (765 modules)
+ ✓ Compiled in 140ms (345 modules)
+ ✓ Compiled in 288ms (420 modules)
+ ✓ Compiled in 849ms (765 modules)
+ ✓ Compiled in 752ms (765 modules)

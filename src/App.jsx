@@ -41,7 +41,7 @@ import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCod
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
 import axios from 'axios';
 
-const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.5.1';
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'v1.5.3';
 
 export default function App() {
   // Mount State to avoid hydration mismatch
@@ -672,7 +672,7 @@ export default function App() {
     const authToken = overrideToken || getAuthToken();
     if (!authToken) return;
     try {
-      const res = await axios.get('/api/scanner/history?limit=15', {
+      const res = await axios.get('/api/scanner/history?limit=5', {
         headers: { Authorization: `Bearer ${authToken}` }
       });
       if (res.data && res.data.history) {
@@ -691,7 +691,8 @@ export default function App() {
   };
 
   const loadAllScanHistory = async (overrideToken = null) => {
-    const authToken = overrideToken || getAuthToken();
+    const rawToken = overrideToken || getAuthToken();
+    const authToken = typeof rawToken === 'string' ? rawToken : null;
     try {
       const res = await axios.get('/api/scanner/history?all=true', authToken ? {
         headers: { Authorization: `Bearer ${authToken}` }
@@ -1147,7 +1148,7 @@ export default function App() {
 
           {/* Version Tracking Footer */}
           <div className="pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-center text-[11px] text-[#5A6E85] dark:text-slate-400">
-            <span className="font-mono">v1.5.1</span>
+            <span className="font-mono">v1.5.3</span>
           </div>
 
         </div>
@@ -1642,7 +1643,7 @@ export default function App() {
                       Belum ada riwayat scan.
                     </div>
                   ) : (
-                    scanHistoryList.map((item, idx) => (
+                    scanHistoryList.slice(0, 5).map((item, idx) => (
                       <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
                         {item.image_url ? (
                           <img 

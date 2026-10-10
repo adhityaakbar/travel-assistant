@@ -69,8 +69,8 @@ export function createHistoryHandler({ authenticate = verifyToken, query: runQue
 
         const url = new URL(request.url);
         const isAll = url.searchParams.get('all') === 'true';
-        const reqLimit = parseInt(url.searchParams.get('limit') || '15', 10);
-        const limitVal = isAll ? 100 : (isNaN(reqLimit) ? 15 : Math.min(reqLimit, 100));
+        const reqLimit = parseInt(url.searchParams.get('limit') || '5', 10);
+        const limitVal = isAll ? 100 : (isNaN(reqLimit) ? 5 : Math.min(reqLimit, 100));
 
         let result;
         try {
