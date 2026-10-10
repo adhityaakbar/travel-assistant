@@ -165,6 +165,7 @@ export default function App() {
   const [valasChartData, setValasChartData] = useState(null);
   const [valasChartLoading, setValasChartLoading] = useState(false);
   const [valasHoverPoint, setValasHoverPoint] = useState(null);
+  const [isValasChartExpanded, setIsValasChartExpanded] = useState(true);
   const [userLocation, setUserLocation] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('travel_assistant_user_location');
@@ -1382,8 +1383,8 @@ export default function App() {
               {/* Presets & Cards */}
               <div className="py-1 space-y-3">
                 {/* Valas Mini Sparkline Chart */}
-                <div className="bg-white dark:bg-[#0D1627] border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-xs">
-                  <div className="flex items-center justify-between">
+                <div className="bg-white dark:bg-[#0D1627] border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-xs transition-all duration-300">
+                  <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsValasChartExpanded(!isValasChartExpanded)}>
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
                       <div>
@@ -1394,34 +1395,71 @@ export default function App() {
                         <div className="text-xs text-slate-500 dark:text-slate-400">Trend Rate Valas</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white font-mono">
-                        {valasChartData?.endRate ? `Rp ${valasChartData.endRate.toLocaleString('id-ID', { minimumFractionDigits: 2 })}` : ratesData.IDR && ratesData[activeChip] ? `Rp ${(ratesData.IDR / ratesData[activeChip]).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-[#0A1937] dark:text-white font-mono">
+                          {valasChartData?.endRate ? `Rp ${valasChartData.endRate.toLocaleString('id-ID', { minimumFractionDigits: 2 })}` : ratesData.IDR && ratesData[activeChip] ? `Rp ${(ratesData.IDR / ratesData[activeChip]).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                        </div>
+                        <div className={`text-[11px] font-bold font-mono flex items-center justify-end gap-0.5 ${valasChartData?.changePct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                          <span>{valasChartData?.changePct >= 0 ? '▲' : '▼'}</span>
+                          {valasChartData ? `${valasChartData.changePct > 0 ? '+' : ''}${valasChartData.changePct}%` : '...'}
+                        </div>
                       </div>
-                      <div className={`text-[11px] font-bold font-mono flex items-center justify-end gap-0.5 ${valasChartData?.changePct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                        <span>{valasChartData?.changePct >= 0 ? '▲' : '▼'}</span>
-                        {valasChartData ? `${valasChartData.changePct > 0 ? '+' : ''}${valasChartData.changePct}%` : '...'}
-                        <span className="text-[9px] text-slate-400 font-normal">({activeValasTimeframe})</span>
-                      </div>
+                      <button className="p-1.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 dark:text-slate-300 transition-colors flex items-center gap-1">
+                        <span className="text-[10px] font-mono font-semibold">{isValasChartExpanded ? 'Tutup' : 'Buka'}</span>
+                        <svg className={`w-4 h-4 transform transition-transform duration-300 ${isValasChartExpanded ? '' : '-rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Timeframe Selector Pills */}
-                  <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
-                    {['7D', '14D', '1M', '3M', '6M', '1Y', '2Y'].map((tf) => (
-                      <button
-                        key={tf}
-                        onClick={() => setActiveValasTimeframe(tf)}
-                        className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg transition-all cursor-pointer ${
-                          activeValasTimeframe === tf
-                            ? 'bg-[#FF0025] text-white shadow-xs shadow-red-500/30'
-                            : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
-                        }`}
-                      >
-                        {tf}
-                      </button>
-                    ))}
-                  </div>
+                  {/* COMPACT SPARKLINE PREVIEW WHEN COLLAPSED */}
+                  {!isValasChartExpanded && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-slate-400">Mini Sparkline ({activeValasTimeframe})</span>
+                      {(() => {
+                        const points = valasChartData?.chartPoints || [];
+                        const isPos = (valasChartData?.changePct || 0) >= 0;
+                        const strokeColor = isPos ? '#22c55e' : '#ef4444';
+                        if (points.length < 2) return null;
+                        const ratesArr = points.map(p => p.rate);
+                        const min = Math.min(...ratesArr);
+                        const max = Math.max(...ratesArr);
+                        const range = max - min || 1;
+                        const svgPoints = points.map((p, idx) => {
+                          const x = (idx / (points.length - 1)) * 160;
+                          const y = 20 - ((p.rate - min) / range) * 16 + 2;
+                          return `${x.toFixed(1)},${y.toFixed(1)}`;
+                        });
+                        return (
+                          <svg className="w-44 h-6" viewBox="0 0 160 20" fill="none">
+                            <path d={`M ${svgPoints.join(' L ')}`} stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* EXPANDED FULL BODY */}
+                  {isValasChartExpanded && (
+                    <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-white/5">
+                      {/* Timeframe Selector Pills */}
+                      <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                        {['7D', '14D', '1M', '3M', '6M', '1Y', '2Y'].map((tf) => (
+                          <button
+                            key={tf}
+                            onClick={() => setActiveValasTimeframe(tf)}
+                            className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg transition-all cursor-pointer ${
+                              activeValasTimeframe === tf
+                                ? 'bg-[#FF0025] text-white shadow-xs shadow-red-500/30'
+                                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+                            }`}
+                          >
+                            {tf}
+                          </button>
+                        ))}
+                      </div>
 
                   {/* SVG Mini Chart Line */}
                   <div className="pt-1 relative" onMouseLeave={() => setValasHoverPoint(null)}>
@@ -1557,7 +1595,9 @@ export default function App() {
                       </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                  )}
+                  </div>
 
                 <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory py-1 px-0 no-scrollbar">
                   {CURRENCIES.map(curr => {
