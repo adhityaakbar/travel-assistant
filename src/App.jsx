@@ -477,9 +477,16 @@ export default function App() {
     setIsCameraActive(true);
     const mode = overrideMode || facingMode || 'environment';
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: mode } }
-      });
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: mode } }
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: mode } }
+        });
+      }
       cameraStreamRef.current = stream;
       setCameraStream(stream);
       if (videoRef.current) {
