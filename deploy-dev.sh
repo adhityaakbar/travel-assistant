@@ -14,6 +14,6 @@ rm -rf .next
 APP_SECRET=${APP_SECRET:-guardian8} JWT_SECRET=${JWT_SECRET:-guardian8} npm run build
 
 echo "==> Restarting PM2 process $PM2_NAME..."
-PORT=3001 pm2 restart "$PM2_NAME" || PORT=3001 pm2 start npm --name "$PM2_NAME" -- start
+PORT=3001 pm2 restart "$PM2_NAME" || PORT=3001 pm2 start node_modules/next/dist/bin/next --name "$PM2_NAME" -- start --port 3001
 
 echo "==> Deployment completed successfully!"
