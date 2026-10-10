@@ -2,7 +2,7 @@ import './globals.css';
 import RegisterSW from './components/RegisterSW';
 
 export const metadata = {
-  title: 'Travel Assistant Japan',
+  title: 'Travel Assistant',
   description: 'Asisten perjalanan personal untuk Jepang',
   manifest: '/manifest.json',
   appleWebApp: {
