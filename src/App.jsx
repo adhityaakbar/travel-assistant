@@ -692,11 +692,10 @@ export default function App() {
 
   const loadAllScanHistory = async (overrideToken = null) => {
     const authToken = overrideToken || getAuthToken();
-    if (!authToken) return;
     try {
-      const res = await axios.get('/api/scanner/history?all=true', {
+      const res = await axios.get('/api/scanner/history?all=true', authToken ? {
         headers: { Authorization: `Bearer ${authToken}` }
-      });
+      } : {});
       if (res.data && res.data.history) {
         setAllScanHistoryList(res.data.history);
         setScanHistoryPage(1);

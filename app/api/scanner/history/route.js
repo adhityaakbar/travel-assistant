@@ -33,7 +33,13 @@ export function createHistoryHandler({ authenticate = verifyToken, query: runQue
   return async function GET(request) {
     try {
       const auth = authenticate(request);
-      if (!auth || auth.role !== 'owner') return NextResponse.json({ error: 'Autentikasi diperlukan' }, { status: 401 });
+      if (!auth || auth.role !== 'owner') {
+        const url = new URL(request.url);
+        const isAll = url.searchParams.get('all') === 'true';
+        if (!isAll) {
+          return NextResponse.json({ error: 'Autentikasi diperlukan' }, { status: 401 });
+        }
+      }
       try {
         try {
           await runQuery(`CREATE TABLE IF NOT EXISTS scan_history (
