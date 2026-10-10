@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic';
 const TIMEFRAME_DAYS = {
   '7D': 7,
   '14D': 14,
-  '30D': 30,
+  '1M': 30,
+  '3M': 90,
   '6M': 180,
   '1Y': 365,
   '2Y': 730,

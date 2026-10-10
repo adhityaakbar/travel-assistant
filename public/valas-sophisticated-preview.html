@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant — Multi-Timeframe Interactive Hover Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#060B14',
+              card: '#0D1627',
+              border: 'rgba(255, 255, 255, 0.08)',
+              red: '#FF0025',
+              orange: '#FDA22B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #060B14; color: #f8fafc; font-family: "Plus Jakarta Sans", sans-serif; }
+    .card-glass { background: #0D1627; border: 1px solid rgba(255, 255, 255, 0.08); }
+    .tf-btn { transition: all 0.2s ease; cursor: pointer; }
+    .tf-btn.active { background: #FF0025; color: #ffffff; font-weight: 700; box-shadow: 0 0 12px rgba(255, 0, 37, 0.4); }
+    
+    .chart-node { transition: all 0.15s ease; cursor: pointer; }
+    .chart-node:hover { r: 6; fill: #ffffff; stroke: #22c55e; stroke-width: 3px; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 max-w-md mx-auto space-y-4">
+
+  <!-- Header Section -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-base font-bold text-white flex items-center gap-2">
+        📈 Group Date Timeframe Charts
+      </h1>
+      <p class="text-xs text-slate-400">Interactive Hover Preview (7D, 14D, 30D, 6M, 1Y, 2Y)</p>
+    </div>
+    <span class="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">PREVIEW v4</span>
+  </div>
+
+  <!-- MULTI-TIMEFRAME CONTAINER -->
+  <div class="card-glass rounded-2xl p-4 space-y-4 relative overflow-hidden">
+
+    <!-- Header Pair Title -->
+    <div class="flex items-center justify-between">
+      <div>
+        <div class="flex items-center gap-1.5">
+          <span class="text-base font-extrabold text-white font-mono">JPY / IDR</span>
+          <span id="tfBadge" class="text-[10px] font-mono px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-bold">7D Mode</span>
+        </div>
+        <div class="text-xs text-slate-400">Japanese Yen</div>
+      </div>
+      <div class="text-right">
+        <div id="displayRate" class="text-base font-extrabold text-white font-mono">Rp 112.99</div>
+        <div id="displayChange" class="text-xs font-bold text-emerald-400 font-mono flex items-center justify-end gap-0.5 mt-0.5">
+          <span>▲</span> +0.75% <span id="tfRangeLabel" class="text-[10px] text-slate-400 font-normal">(7D)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeframe Selector Pills -->
+    <div class="flex items-center justify-between bg-black/40 p-1 rounded-xl border border-white/5 text-xs font-mono">
+      <button onclick="switchTimeframe('7D')" id="btn-7D" class="tf-btn active px-2.5 py-1 rounded-lg text-white font-bold">7D</button>
+      <button onclick="switchTimeframe('14D')" id="btn-14D" class="tf-btn px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">14D</button>
+      <button onclick="switchTimeframe('30D')" id="btn-30D" class="tf-btn px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">30D</button>
+      <button onclick="switchTimeframe('6M')" id="btn-6M" class="tf-btn px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">6M</button>
+      <button onclick="switchTimeframe('1Y')" id="btn-1Y" class="tf-btn px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">1Y</button>
+      <button onclick="switchTimeframe('2Y')" id="btn-2Y" class="tf-btn px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">2Y</button>
+    </div>
+
+    <!-- SVG GRAPH VIEWPORT -->
+    <div class="pt-2 relative">
+
+      <svg class="w-full h-36" viewBox="0 0 320 120" fill="none" id="svgContainer">
+        <defs>
+          <linearGradient id="chartGradArea4" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="chartLineGrad4" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#FDA22B"/>
+            <stop offset="100%" stop-color="#22c55e"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Grid Lines -->
+        <line x1="0" y1="20" x2="320" y2="20" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+        <line x1="0" y1="60" x2="320" y2="60" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+        <line x1="0" y1="100" x2="320" y2="100" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+
+        <!-- Dynamic Area & Path -->
+        <path id="svgArea" d="" fill="url(#chartGradArea4)" />
+        <path id="svgPath" d="" stroke="url(#chartLineGrad4)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Dynamic Point Nodes Group -->
+        <g id="svgNodes"></g>
+      </svg>
+
+      <!-- Hover Info Bar -->
+      <div class="mt-2 p-2.5 bg-white/5 border border-white/10 rounded-xl flex items-center justify-between text-xs font-mono">
+        <span id="hoverDate" class="text-slate-400">Sentuh / hover titik pada grafik</span>
+        <span id="hoverValue" class="font-bold text-emerald-400">Rp 112.99</span>
+      </div>
+
+      <!-- X-Axis Timeline Labels -->
+      <div id="xAxisLabels" class="flex justify-between text-[9px] font-mono text-slate-400 pt-2 border-t border-white/5"></div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Dataset Multi-Timeframe (7D, 14D, 30D, 6M, 1Y, 2Y)
+    const datasets = {
+      '7D': {
+        badge: '7D Mode',
+        change: '▲ +0.75%',
+        isPositive: true,
+        points: [
+          { x: 10, y: 95, date: '03 OKT 2026', rate: 'Rp 112.15' },
+          { x: 60, y: 65, date: '04 OKT 2026', rate: 'Rp 112.80' },
+          { x: 110, y: 85, date: '05 OKT 2026', rate: 'Rp 112.40' },
+          { x: 160, y: 25, date: '06 OKT 2026', rate: 'Rp 114.10' },
+          { x: 210, y: 55, date: '07 OKT 2026', rate: 'Rp 113.10' },
+          { x: 260, y: 35, date: '08 OKT 2026', rate: 'Rp 113.60' },
+          { x: 310, y: 15, date: '09 OKT (HARI INI)', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['03 OKT', '04 OKT', '05 OKT', '06 OKT', '07 OKT', '08 OKT', 'HARI INI']
+      },
+      '14D': {
+        badge: '14D Group Mode',
+        change: '▼ -0.60%',
+        isPositive: false,
+        points: [
+          { x: 10, y: 30, date: '25 SEP 2026', rate: 'Rp 113.67' },
+          { x: 50, y: 45, date: '27 SEP 2026', rate: 'Rp 113.40' },
+          { x: 90, y: 20, date: '29 SEP 2026', rate: 'Rp 113.90' },
+          { x: 130, y: 60, date: '01 OKT 2026', rate: 'Rp 112.85' },
+          { x: 170, y: 80, date: '03 OKT 2026', rate: 'Rp 112.15' },
+          { x: 210, y: 25, date: '05 OKT 2026', rate: 'Rp 114.10' },
+          { x: 250, y: 50, date: '07 OKT 2026', rate: 'Rp 113.10' },
+          { x: 310, y: 55, date: '09 OKT (HARI INI)', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['25 SEP', '28 SEP', '01 OKT', '04 OKT', '07 OKT', 'HARI INI']
+      },
+      '30D': {
+        badge: '30D Group Mode',
+        change: '▼ -0.90%',
+        isPositive: false,
+        points: [
+          { x: 10, y: 20, date: '09 SEP 2026', rate: 'Rp 114.02' },
+          { x: 60, y: 50, date: '15 SEP 2026', rate: 'Rp 113.20' },
+          { x: 110, y: 35, date: '21 SEP 2026', rate: 'Rp 113.60' },
+          { x: 160, y: 70, date: '27 SEP 2026', rate: 'Rp 112.70' },
+          { x: 210, y: 90, date: '03 OKT 2026', rate: 'Rp 112.15' },
+          { x: 260, y: 30, date: '06 OKT 2026', rate: 'Rp 114.10' },
+          { x: 310, y: 60, date: '09 OKT (HARI INI)', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['09 SEP', '16 SEP', '23 SEP', '30 SEP', '06 OKT', 'HARI INI']
+      },
+      '6M': {
+        badge: '6M Macro Mode',
+        change: '▲ +5.03%',
+        isPositive: true,
+        points: [
+          { x: 10, y: 100, date: '09 APR 2026', rate: 'Rp 107.58' },
+          { x: 70, y: 85, date: '15 MEI 2026', rate: 'Rp 108.90' },
+          { x: 130, y: 65, date: '20 JUN 2026', rate: 'Rp 110.40' },
+          { x: 190, y: 40, date: '25 JUL 2026', rate: 'Rp 112.10' },
+          { x: 250, y: 25, date: '30 AGU 2026', rate: 'Rp 113.80' },
+          { x: 310, y: 35, date: '09 OKT 2026', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT']
+      },
+      '1Y': {
+        badge: '1Y Macro Mode',
+        change: '▲ +4.24%',
+        isPositive: true,
+        points: [
+          { x: 10, y: 90, date: '09 OKT 2025', rate: 'Rp 108.39' },
+          { x: 70, y: 75, date: '15 DES 2025', rate: 'Rp 109.80' },
+          { x: 130, y: 95, date: '20 FEB 2026', rate: 'Rp 107.90' },
+          { x: 190, y: 55, date: '25 MEI 2026', rate: 'Rp 111.20' },
+          { x: 250, y: 30, date: '30 AGU 2026', rate: 'Rp 113.50' },
+          { x: 310, y: 35, date: '09 OKT 2026', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['OKT 25', 'DES', 'FEB 26', 'APR', 'JUN', 'AGU', 'OKT 26']
+      },
+      '2Y': {
+        badge: '2Y Long-Term Mode',
+        change: '▲ +7.50%',
+        isPositive: true,
+        points: [
+          { x: 10, y: 105, date: '09 OKT 2024', rate: 'Rp 105.11' },
+          { x: 70, y: 85, date: '15 APR 2025', rate: 'Rp 107.20' },
+          { x: 130, y: 70, date: '20 OKT 2025', rate: 'Rp 108.80' },
+          { x: 190, y: 90, date: '25 FEB 2026', rate: 'Rp 107.50' },
+          { x: 250, y: 25, date: '30 JUN 2026', rate: 'Rp 113.80' },
+          { x: 310, y: 35, date: '09 OKT 2026', rate: 'Rp 112.99' },
+        ],
+        xLabels: ['OKT 24', 'APR 25', 'OKT 25', 'APR 26', 'OKT 26']
+      }
+    };
+
+    function renderTimeframe(tfKey) {
+      const data = datasets[tfKey];
+      document.getElementById('tfBadge').textContent = data.badge;
+      document.getElementById('tfRangeLabel').textContent = `(${tfKey})`;
+      
+      const changeEl = document.getElementById('displayChange');
+      changeEl.innerHTML = `<span>${data.isPositive ? '▲' : '▼'}</span> ${data.change} <span class="text-[10px] text-slate-400 font-normal">(${tfKey})</span>`;
+      changeEl.className = `text-xs font-bold font-mono flex items-center justify-end gap-0.5 mt-0.5 ${data.isPositive ? 'text-emerald-400' : 'text-red-400'}`;
+
+      // Build SVG Path String
+      let pathD = `M ${data.points[0].x},${data.points[0].y}`;
+      for (let i = 1; i < data.points.length; i++) {
+        pathD += ` L ${data.points[i].x},${data.points[i].y}`;
+      }
+      document.getElementById('svgPath').setAttribute('d', pathD);
+
+      const areaD = `${pathD} L 310,110 L 10,110 Z`;
+      document.getElementById('svgArea').setAttribute('d', areaD);
+
+      // Render Nodes
+      const nodesContainer = document.getElementById('svgNodes');
+      nodesContainer.innerHTML = '';
+      data.points.forEach((p, idx) => {
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', p.x);
+        circle.setAttribute('cy', p.y);
+        circle.setAttribute('r', idx === data.points.length - 1 ? 5 : 4);
+        circle.setAttribute('fill', data.isPositive ? '#22c55e' : '#FF0025');
+        circle.setAttribute('class', 'chart-node');
+
+        circle.addEventListener('mouseenter', () => {
+          document.getElementById('hoverDate').textContent = p.date;
+          document.getElementById('hoverValue').textContent = p.rate;
+        });
+
+        circle.addEventListener('touchstart', () => {
+          document.getElementById('hoverDate').textContent = p.date;
+          document.getElementById('hoverValue').textContent = p.rate;
+        });
+
+        nodesContainer.appendChild(circle);
+      });
+
+      // Render X-Axis
+      const xContainer = document.getElementById('xAxisLabels');
+      xContainer.innerHTML = '';
+      data.xLabels.forEach(lbl => {
+        const span = document.createElement('span');
+        span.textContent = lbl;
+        xContainer.appendChild(span);
+      });
+    }
+
+    function switchTimeframe(tfKey) {
+      document.querySelectorAll('.tf-btn').forEach(btn => btn.classList.remove('active', 'text-white', 'font-bold'));
+      const activeBtn = document.getElementById(`btn-${tfKey}`);
+      if (activeBtn) activeBtn.classList.add('active', 'text-white', 'font-bold');
+      renderTimeframe(tfKey);
+    }
+
+    // Initial Render 7D
+    renderTimeframe('7D');
+  </script>
+
+</body>
+</html>

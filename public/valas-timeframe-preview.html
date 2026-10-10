@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant — Valas Multi-Timeframe Mini Chart Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#060B14',
+              card: '#0D1627',
+              border: 'rgba(255, 255, 255, 0.08)',
+              red: '#FF0025',
+              orange: '#FDA22B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #060B14; color: #f8fafc; font-family: "Plus Jakarta Sans", sans-serif; }
+    .card-glass { background: #0D1627; border: 1px solid rgba(255, 255, 255, 0.08); }
+    .timeframe-pill { transition: all 0.2s ease; }
+    .timeframe-pill.active { background: #FF0025; color: #ffffff; font-weight: 700; box-shadow: 0 0 12px rgba(255, 0, 37, 0.4); }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 max-w-md mx-auto space-y-4">
+
+  <!-- Title Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-base font-bold text-white flex items-center gap-2">
+        📊 Multi-Timeframe Trend Valas
+      </h1>
+      <p class="text-xs text-slate-400">Analisis Historis Kurs Real-Time (Frankfurter Engine)</p>
+    </div>
+    <span class="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">PREVIEW</span>
+  </div>
+
+  <!-- MINI CHART CONTAINER WITH TIMEFRAME SELECTION -->
+  <div class="card-glass rounded-2xl p-4 space-y-4 relative overflow-hidden">
+    
+    <!-- Top Currency Header & Live Stats -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <span class="text-2xl">🇯🇵</span>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-base font-extrabold text-white font-mono">JPY / IDR</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-bold">6M Mode</span>
+          </div>
+          <div class="text-xs text-slate-400">Japanese Yen</div>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-base font-extrabold text-white font-mono">Rp 112.99</div>
+        <!-- Positive percentage indicator (+5.03% for 6M) -->
+        <div class="text-xs font-bold text-emerald-400 font-mono flex items-center justify-end gap-0.5 mt-0.5">
+          <span>▲</span> +5.03% <span class="text-[10px] text-slate-400 font-normal">(6M)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Timeframe Selector Pills [ 7D | 14D | 30D | 6M | 1Y | 2Y ] -->
+    <div class="flex items-center justify-between bg-black/40 p-1 rounded-xl border border-white/5 text-xs font-mono">
+      <button class="timeframe-pill px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">7D</button>
+      <button class="timeframe-pill px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">14D</button>
+      <button class="timeframe-pill px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">30D</button>
+      <button class="timeframe-pill active px-2.5 py-1 rounded-lg text-white font-bold">6M</button>
+      <button class="timeframe-pill px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">1Y</button>
+      <button class="timeframe-pill px-2.5 py-1 rounded-lg text-slate-400 hover:text-white">2Y</button>
+    </div>
+
+    <!-- Mini Smooth Downsampled SVG Chart Line -->
+    <div class="pt-1">
+      <svg class="w-full h-20" viewBox="0 0 300 70" fill="none">
+        <defs>
+          <linearGradient id="chartGradPos" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lineGradPos" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#FDA22B"/>
+            <stop offset="100%" stop-color="#22c55e"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Grid Lines Background -->
+        <line x1="0" y1="20" x2="300" y2="20" stroke="white" stroke-opacity="0.04" stroke-dasharray="3 3"/>
+        <line x1="0" y1="45" x2="300" y2="45" stroke="white" stroke-opacity="0.04" stroke-dasharray="3 3"/>
+
+        <!-- Area Fill -->
+        <path d="M0 55 Q 50 60, 100 45 T 200 25 T 300 12 L 300 70 L 0 70 Z" fill="url(#chartGradPos)" />
+
+        <!-- Downsampled Smooth Curve -->
+        <path d="M0 55 Q 50 60, 100 45 T 200 25 T 300 12" stroke="url(#lineGradPos)" stroke-width="2.5" stroke-linecap="round"/>
+
+        <!-- Start & End Value Markers -->
+        <circle cx="0" cy="55" r="3" fill="#FDA22B" />
+        <circle cx="300" cy="12" r="4" fill="#22c55e" />
+        <circle cx="300" cy="12" r="8" fill="#22c55e" fill-opacity="0.3" class="animate-ping" />
+      </svg>
+      
+      <!-- Date Range Axis Label -->
+      <div class="flex justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-white/5">
+        <span>09 APR 2026 (Rp 107,58)</span>
+        <span>09 OKT 2026 (Rp 112,99)</span>
+      </div>
+    </div>
+
+    <!-- Data Summary Footer Stats -->
+    <div class="grid grid-cols-3 gap-2 pt-1 border-t border-white/5 text-center">
+      <div class="bg-white/5 p-2 rounded-lg">
+        <div class="text-[9px] text-slate-400 uppercase font-mono">Rate Awal</div>
+        <div class="text-xs font-bold text-slate-200 font-mono mt-0.5">Rp 107.58</div>
+      </div>
+      <div class="bg-white/5 p-2 rounded-lg">
+        <div class="text-[9px] text-slate-400 uppercase font-mono">Rate Tertinggi</div>
+        <div class="text-xs font-bold text-emerald-400 font-mono mt-0.5">Rp 114.02</div>
+      </div>
+      <div class="bg-white/5 p-2 rounded-lg">
+        <div class="text-[9px] text-slate-400 uppercase font-mono">Data Points</div>
+        <div class="text-xs font-bold text-slate-200 font-mono mt-0.5">131 Hari</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

@@ -1408,7 +1408,7 @@ export default function App() {
 
                   {/* Timeframe Selector Pills */}
                   <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
-                    {['7D', '14D', '30D', '6M', '1Y', '2Y'].map((tf) => (
+                    {['7D', '14D', '1M', '3M', '6M', '1Y', '2Y'].map((tf) => (
                       <button
                         key={tf}
                         onClick={() => setActiveValasTimeframe(tf)}
@@ -1428,11 +1428,6 @@ export default function App() {
                     {valasChartLoading && (
                       <div className="absolute inset-0 bg-white/50 dark:bg-black/40 backdrop-blur-[1px] flex items-center justify-center text-xs font-mono text-slate-400 z-10 rounded-lg">
                         Loading chart...
-                      </div>
-                    )}
-                    {valasHoverPoint && (
-                      <div className="absolute top-0 right-2 z-20 bg-slate-900/90 border border-white/10 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-lg backdrop-blur-sm pointer-events-none">
-                        <span className="text-slate-400">{valasHoverPoint.date}:</span> <span className="font-bold text-emerald-400">Rp {valasHoverPoint.rate.toLocaleString('id-ID')}</span>
                       </div>
                     )}
                     {(() => {
@@ -1466,8 +1461,6 @@ export default function App() {
                       }, '');
 
                       const areaD = `${pathD} L 300 60 L 0 60 Z`;
-                      const firstPt = svgPoints[0];
-                      const lastPt = svgPoints[svgPoints.length - 1];
 
                       // Select ~5 key milestone points across the dataset for interactive hover dots
                       const keySampleIndices = new Set();
@@ -1499,6 +1492,11 @@ export default function App() {
                               const isLast = idx === svgPoints.length - 1;
                               const dotColor = isFirst ? '#FDA22B' : strokeColor;
 
+                              // Pin label position relative to dot inside SVG
+                              const isNearRight = pt.x > 200;
+                              const tooltipX = isNearRight ? pt.x - 70 : pt.x + 8;
+                              const tooltipY = Math.max(12, pt.y - 12);
+
                               return (
                                 <g key={pt.date} className="cursor-pointer" onMouseEnter={() => setValasHoverPoint(pt)}>
                                   {/* Invisible expanded hit area */}
@@ -1511,6 +1509,15 @@ export default function App() {
                                     fill={dotColor}
                                     pointerEvents="none"
                                   />
+                                  {/* Direct SVG pinned tooltip on hover */}
+                                  {isHovered && (
+                                    <g transform={`translate(${tooltipX}, ${tooltipY})`} className="pointer-events-none">
+                                      <rect x="0" y="0" width="76" height="20" rx="4" fill="#0f172a" fillOpacity="0.9" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                                      <text x="38" y="13" textAnchor="middle" fill="#22c55e" fontSize="9" fontWeight="bold" fontFamily="monospace">
+                                        Rp {pt.rate.toLocaleString('id-ID')}
+                                      </text>
+                                    </g>
+                                  )}
                                 </g>
                               );
                             })}
