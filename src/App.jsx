@@ -1506,8 +1506,10 @@ export default function App() {
                                   <circle
                                     cx={pt.x}
                                     cy={pt.y}
-                                    r={isHovered ? 5.5 : isLast ? 3.5 : 3}
-                                    fill={dotColor}
+                                    r={isHovered ? 6 : isLast ? 3.5 : 3}
+                                    fill={isHovered ? '#ffffff' : dotColor}
+                                    stroke={isHovered ? strokeColor : 'none'}
+                                    strokeWidth={isHovered ? 2.5 : 0}
                                     pointerEvents="none"
                                   />
                                   {/* Direct SVG pinned tooltip on hover centered above dot */}
