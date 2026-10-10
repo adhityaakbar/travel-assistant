@@ -165,7 +165,7 @@ export default function App() {
   const [valasChartData, setValasChartData] = useState(null);
   const [valasChartLoading, setValasChartLoading] = useState(false);
   const [valasHoverPoint, setValasHoverPoint] = useState(null);
-  const [isValasChartExpanded, setIsValasChartExpanded] = useState(true);
+  const [isValasChartExpanded, setIsValasChartExpanded] = useState(false);
   const [userLocation, setUserLocation] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('travel_assistant_user_location');
