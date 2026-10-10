@@ -1459,26 +1459,58 @@ export default function App() {
                       }, '');
 
                       const areaD = `${pathD} L 300 60 L 0 60 Z`;
+                      const firstPt = svgPoints[0];
                       const lastPt = svgPoints[svgPoints.length - 1];
 
                       return (
-                        <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
-                          <defs>
-                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3"/>
-                              <stop offset="100%" stopColor={strokeColor} stopOpacity="0"/>
-                            </linearGradient>
-                          </defs>
-                          <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
-                          <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
-                          <path d={areaD} fill={`url(#${gradId})`} />
-                          <path d={pathD} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx={lastPt.x} cy={lastPt.y} r="3.5" fill={strokeColor} />
-                          <circle cx={lastPt.x} cy={lastPt.y} r="6.5" fill={strokeColor} fillOpacity="0.3" className="animate-ping" />
-                        </svg>
+                        <>
+                          <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
+                            <defs>
+                              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3"/>
+                                <stop offset="100%" stopColor={strokeColor} stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                            <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                            <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                            <path d={areaD} fill={`url(#${gradId})`} />
+                            <path d={pathD} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx={firstPt.x} cy={firstPt.y} r="3" fill="#FDA22B" />
+                            <circle cx={lastPt.x} cy={lastPt.y} r="3.5" fill={strokeColor} />
+                            <circle cx={lastPt.x} cy={lastPt.y} r="6.5" fill={strokeColor} fillOpacity="0.3" className="animate-ping" />
+                          </svg>
+                          <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
+                            <span>{valasChartData?.startDate ? `${valasChartData.startDate} (Rp ${valasChartData.startRate?.toLocaleString('id-ID')})` : ''}</span>
+                            <span>{valasChartData?.endDate ? `${valasChartData.endDate} (Rp ${valasChartData.endRate?.toLocaleString('id-ID')})` : ''}</span>
+                          </div>
+                        </>
                       );
                     })()}
                   </div>
+
+                  {/* Summary Stats Footer Grid */}
+                  {valasChartData && (
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 dark:border-white/5 text-center">
+                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                        <div className="text-[9px] text-slate-400 uppercase font-mono">Rate Awal</div>
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono mt-0.5">
+                          Rp {valasChartData.startRate?.toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                        <div className="text-[9px] text-slate-400 uppercase font-mono">Rate Tertinggi</div>
+                        <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                          Rp {valasChartData.maxRate?.toLocaleString('id-ID')}
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                        <div className="text-[9px] text-slate-400 uppercase font-mono">Data Points</div>
+                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono mt-0.5">
+                          {valasChartData.dataPointsCount} Hari
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory py-1 px-0 no-scrollbar">
