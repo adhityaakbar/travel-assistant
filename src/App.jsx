@@ -1649,32 +1649,6 @@ export default function App() {
                     </a>
                   </div>
 
-                  <button
-                    onClick={saveScannedResultToHistory}
-                    disabled={scannedResultSaved || scanSaving}
-                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-                      scannedResultSaved
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
-                        : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
-                    }`}
-                  >
-                    {scanSaving ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        <span>Menyimpan ke Server...</span>
-                      </>
-                    ) : scannedResultSaved ? (
-                      <>
-                        <Check size={14} />
-                        <span>Tersimpan di Riwayat Database</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>💾 Simpan Hasil Scan ke Server & Database</span>
-                      </>
-                    )}
-                  </button>
-
                   <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
                     <div>
                       <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
@@ -1712,6 +1686,32 @@ export default function App() {
                       )}
                     </div>
                   )}
+
+                  <button
+                    onClick={saveScannedResultToHistory}
+                    disabled={scannedResultSaved || scanSaving}
+                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      scannedResultSaved
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
+                        : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
+                    }`}
+                  >
+                    {scanSaving ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Menyimpan ke Server...</span>
+                      </>
+                    ) : scannedResultSaved ? (
+                      <>
+                        <Check size={14} />
+                        <span>Tersimpan di Riwayat Database</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾 Simpan Hasil Scan ke Server & Database</span>
+                      </>
+                    )}
+                  </button>
 
                   {/* Feedback Correction Input (Collapsible) - Moved to bottom */}
                   <div className="space-y-2 pt-1 border-t border-slate-200/60 dark:border-white/10">
