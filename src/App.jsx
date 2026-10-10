@@ -1429,12 +1429,13 @@ export default function App() {
                         const range = max - min || 1;
                         const svgPoints = points.map((p, idx) => {
                           const x = (idx / (points.length - 1)) * 160;
-                          const y = 20 - ((p.rate - min) / range) * 16 + 2;
+                          // Padding Y 3px top/bottom inside 24px height viewBox (3 to 21) to prevent line overflow stroke clip
+                          const y = 21 - ((p.rate - min) / range) * 18;
                           return `${x.toFixed(1)},${y.toFixed(1)}`;
                         });
                         return (
-                          <svg className="w-44 h-6" viewBox="0 0 160 20" fill="none">
-                            <path d={`M ${svgPoints.join(' L ')}`} stroke={strokeColor} strokeWidth="1.5" strokeLinecap="round"/>
+                          <svg className="w-40 h-6 overflow-hidden" viewBox="0 0 160 24" fill="none">
+                            <path d={`M ${svgPoints.join(' L ')}`} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         );
                       })()}
