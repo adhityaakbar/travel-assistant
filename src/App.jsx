@@ -1502,18 +1502,15 @@ export default function App() {
                               return (
                                 <g key={pt.date} className="cursor-pointer" onMouseEnter={() => setValasHoverPoint(pt)}>
                                   {/* Invisible expanded hit area */}
-                                  <circle cx={pt.x} cy={pt.y} r="10" fill="transparent" />
+                                  <circle cx={pt.x} cy={pt.y} r="12" fill="transparent" pointerEvents="all" />
                                   {/* Visible point circle */}
                                   <circle
                                     cx={pt.x}
                                     cy={pt.y}
                                     r={isHovered ? 5.5 : isLast ? 3.5 : 3}
                                     fill={dotColor}
-                                    className="transition-all duration-150"
+                                    pointerEvents="none"
                                   />
-                                  {isLast && !isHovered && (
-                                    <circle cx={pt.x} cy={pt.y} r="7" fill={strokeColor} fillOpacity="0.3" className="animate-ping pointer-events-none" />
-                                  )}
                                 </g>
                               );
                             })}
