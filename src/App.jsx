@@ -164,6 +164,7 @@ export default function App() {
   const [activeValasTimeframe, setActiveValasTimeframe] = useState('7D');
   const [valasChartData, setValasChartData] = useState(null);
   const [valasChartLoading, setValasChartLoading] = useState(false);
+  const [valasHoverPoint, setValasHoverPoint] = useState(null);
   const [userLocation, setUserLocation] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('travel_assistant_user_location');
@@ -347,6 +348,7 @@ export default function App() {
   // Fetch Valas Chart Data
   const loadValasChart = async (curr = activeChip, tf = activeValasTimeframe) => {
     setValasChartLoading(true);
+    setValasHoverPoint(null);
     try {
       const res = await axios.get(`/api/valas/history-chart?currency=${curr}&timeframe=${tf}`);
       if (res.data && res.data.success) {
@@ -1422,10 +1424,15 @@ export default function App() {
                   </div>
 
                   {/* SVG Mini Chart Line */}
-                  <div className="pt-1 relative">
+                  <div className="pt-1 relative" onMouseLeave={() => setValasHoverPoint(null)}>
                     {valasChartLoading && (
                       <div className="absolute inset-0 bg-white/50 dark:bg-black/40 backdrop-blur-[1px] flex items-center justify-center text-xs font-mono text-slate-400 z-10 rounded-lg">
                         Loading chart...
+                      </div>
+                    )}
+                    {valasHoverPoint && (
+                      <div className="absolute top-0 right-2 z-20 bg-slate-900/90 border border-white/10 text-white px-2.5 py-1 rounded-lg text-[10px] font-mono shadow-lg backdrop-blur-sm pointer-events-none">
+                        <span className="text-slate-400">{valasHoverPoint.date}:</span> <span className="font-bold text-emerald-400">Rp {valasHoverPoint.rate.toLocaleString('id-ID')}</span>
                       </div>
                     )}
                     {(() => {
@@ -1451,7 +1458,7 @@ export default function App() {
                       const svgPoints = points.map((p, idx) => {
                         const x = (idx / (points.length - 1)) * 300;
                         const y = 50 - ((p.rate - min) / range) * 40 + 5;
-                        return { x, y };
+                        return { x, y, date: p.date, rate: p.rate };
                       });
 
                       const pathD = svgPoints.reduce((acc, pt, idx) => {
@@ -1462,9 +1469,17 @@ export default function App() {
                       const firstPt = svgPoints[0];
                       const lastPt = svgPoints[svgPoints.length - 1];
 
+                      // Select ~5 key milestone points across the dataset for interactive hover dots
+                      const keySampleIndices = new Set();
+                      const sampleCount = Math.min(6, svgPoints.length);
+                      for (let i = 0; i < sampleCount; i++) {
+                        const idx = Math.round((i / (sampleCount - 1)) * (svgPoints.length - 1));
+                        keySampleIndices.add(idx);
+                      }
+
                       return (
                         <>
-                          <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
+                          <svg className="w-full h-16 overflow-visible" viewBox="0 0 300 60" fill="none">
                             <defs>
                               <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor={strokeColor} stopOpacity="0.3"/>
@@ -1475,9 +1490,33 @@ export default function App() {
                             <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
                             <path d={areaD} fill={`url(#${gradId})`} />
                             <path d={pathD} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            <circle cx={firstPt.x} cy={firstPt.y} r="3" fill="#FDA22B" />
-                            <circle cx={lastPt.x} cy={lastPt.y} r="3.5" fill={strokeColor} />
-                            <circle cx={lastPt.x} cy={lastPt.y} r="6.5" fill={strokeColor} fillOpacity="0.3" className="animate-ping" />
+                            
+                            {/* Key milestone interactive hover dots */}
+                            {svgPoints.map((pt, idx) => {
+                              if (!keySampleIndices.has(idx)) return null;
+                              const isHovered = valasHoverPoint?.date === pt.date;
+                              const isFirst = idx === 0;
+                              const isLast = idx === svgPoints.length - 1;
+                              const dotColor = isFirst ? '#FDA22B' : strokeColor;
+
+                              return (
+                                <g key={pt.date} className="cursor-pointer" onMouseEnter={() => setValasHoverPoint(pt)}>
+                                  {/* Invisible expanded hit area */}
+                                  <circle cx={pt.x} cy={pt.y} r="10" fill="transparent" />
+                                  {/* Visible point circle */}
+                                  <circle
+                                    cx={pt.x}
+                                    cy={pt.y}
+                                    r={isHovered ? 5.5 : isLast ? 3.5 : 3}
+                                    fill={dotColor}
+                                    className="transition-all duration-150"
+                                  />
+                                  {isLast && (
+                                    <circle cx={pt.x} cy={pt.y} r="7" fill={strokeColor} fillOpacity="0.3" className="animate-ping pointer-events-none" />
+                                  )}
+                                </g>
+                              );
+                            })}
                           </svg>
                           <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
                             <span>{valasChartData?.startDate ? `${valasChartData.startDate} (Rp ${valasChartData.startRate?.toLocaleString('id-ID')})` : ''}</span>
