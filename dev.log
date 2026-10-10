@@ -1,5 +1,5 @@
 
-> travel-assistant@1.5.0 dev:https
+> travel-assistant@1.5.1 dev:https
 > next dev -H 0.0.0.0 --experimental-https --experimental-https-key ./certificates/key.pem --experimental-https-cert ./certificates/cert.pem -p 3000
 
  ⚠ Self-signed certificates are currently an experimental feature, use with caution.
@@ -9,31 +9,27 @@
   - Environments: .env
 
  ✓ Starting...
- ✓ Ready in 956ms
+ ✓ Ready in 1304ms
  ○ Compiling / ...
- ✓ Compiled / in 1696ms (760 modules)
- GET / 200 in 1868ms
- ✓ Compiled /api/chat/history in 232ms (525 modules)
- ✓ Compiled (667 modules)
- GET /api/auth/me 200 in 554ms
- GET /api/valas/history 200 in 604ms
- GET /api/chat/history 200 in 603ms
- GET /api/scanner/history?limit=15 200 in 634ms
- GET /api/valas/rates 200 in 953ms
- ✓ Compiled /api/scanner/analyze in 211ms (670 modules)
- POST /api/scanner/analyze 200 in 23659ms
- POST /api/scanner/history 201 in 167ms
- GET /api/scanner/history?limit=15 200 in 65ms
- GET /api/chat/history 200 in 80ms
- ✓ Compiled /api/places/nearby in 266ms (664 modules)
- GET /api/places/nearby?lat=-6.24534870113485&lng=106.85229947346637&category=all 200 in 538ms
- GET /api/chat/history 200 in 37ms
- GET /api/scanner/history?limit=15 200 in 67ms
- GET /api/chat/history 200 in 71ms
- GET /api/places/nearby?lat=-6.24534870113485&lng=106.85229947346637&category=all 200 in 70ms
- GET /api/chat/history 200 in 19ms
- GET /api/scanner/history?limit=15 200 in 97ms
- GET /api/chat/history 200 in 40ms
- GET /api/places/nearby?lat=-6.24534870113485&lng=106.85229947346637&category=all 200 in 44ms
- GET /api/chat/history 200 in 10ms
- ✓ Compiled in 868ms (760 modules)
+ ✓ Compiled /_not-found in 4.1s (763 modules)
+ GET / 200 in 1232ms
+ ○ Compiling /api/valas/rates ...
+ ✓ Compiled /api/valas/rates in 558ms (526 modules)
+ ✓ Compiled (668 modules)
+ GET /api/auth/me 200 in 1136ms
+ GET /api/chat/history 200 in 1189ms
+ GET /api/valas/history 200 in 1189ms
+ GET /api/scanner/history?limit=15 200 in 1217ms
+ GET /api/valas/rates 200 in 1922ms
+ GET /api/chat/history 200 in 73ms
+ GET /api/scanner/history?limit=15 200 in 108ms
+ ✓ Compiled /api/places/nearby in 293ms (671 modules)
+ GET /api/places/nearby?lat=-6.245371772933977&lng=106.85229574938654&category=all 200 in 493ms
+ GET /api/chat/history 200 in 16ms
+ GET /api/places/nearby?lat=-6.245371772933977&lng=106.85229574938654&category=all 200 in 42ms
+ GET /api/scanner/history?limit=15 200 in 111ms
+ ✓ Compiled in 865ms (1004 modules)
+ ✓ Compiled in 880ms (343 modules)
+ ✓ Compiled in 800ms (763 modules)
+ ✓ Compiled in 171ms (763 modules)
+ ✓ Compiled in 107ms (419 modules)
