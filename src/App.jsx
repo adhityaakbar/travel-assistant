@@ -478,18 +478,40 @@ export default function App() {
     stopCamera();
     setScanError('');
     setIsCameraActive(true);
-    const mode = overrideMode || facingMode || 'environment';
+    const targetMode = overrideMode || facingMode || 'environment';
+
     try {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: mode } }
-        });
-      } catch {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: mode } }
-        });
+      let stream = null;
+
+      // 1. Coba cari deviceId kamera belakang via enumerateDevices
+      if (targetMode === 'environment' && navigator.mediaDevices?.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(d => d.kind === 'videoinput');
+          const backDevice = videoDevices.find(d => /back|rear|environment|belakang/i.test(d.label)) || videoDevices[videoDevices.length - 1];
+          if (backDevice?.deviceId) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { deviceId: { exact: backDevice.deviceId } }
+            });
+          }
+        } catch (e) {
+          console.warn('Coba enumerateDevices gagal:', e);
+        }
       }
+
+      // 2. Fallback constraint exact -> ideal
+      if (!stream) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: targetMode } }
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: targetMode } }
+          });
+        }
+      }
+
       cameraStreamRef.current = stream;
       setCameraStream(stream);
       if (videoRef.current) {
@@ -498,15 +520,11 @@ export default function App() {
       }
     } catch (err) {
       console.error('Kamera error:', err);
-      // Fallback ke kamera depan jika kamera belakang ideal gagal
-      if (mode === 'environment') {
-        setFacingMode('user');
-        return startCamera('user');
-      }
+      // Strict policy: jangan pernah fallback otomatis ke kamera depan ('user') jika target mode environment
       const message = err?.name === 'NotAllowedError'
         ? 'Izin kamera ditolak. Izinkan akses kamera di browser (klik icon gembok di address bar) lalu coba lagi.'
         : err?.name === 'NotFoundError'
-          ? 'Kamera tidak ditemukan. Hubungkan webcam atau perangkat kamera.'
+          ? 'Kamera belakang tidak ditemukan.'
           : 'Kamera gagal dibuka. Pastikan izin kamera aktif & tidak dipakai aplikasi lain.';
       setScanError(message);
       stopCamera();
@@ -611,6 +629,7 @@ export default function App() {
   const processScan = async (imageDataUrl) => {
     setScanLoading(true);
     setScanError('');
+    setScannedResult(null);
 
     // Fetch GPS location at scan/upload time if available
     let photoLat = userLocation?.lat || null;
@@ -1417,7 +1436,7 @@ export default function App() {
               </div>
 
               {/* Real Camera Viewfinder / Capture Box */}
-              <div className={`bg-white dark:bg-[#0A1937]/80 border-2 border-dashed border-red-500/40 rounded-2xl text-center shadow-xs overflow-hidden relative transition-all ${isCameraActive ? 'p-0 border-solid border-slate-900' : 'p-4'}`}>
+              <div className={`bg-white dark:bg-[#0A1937]/80 border-2 border-dashed border-red-500/40 rounded-2xl text-center shadow-xs overflow-hidden relative transition-all ${isCameraActive || capturedImage || scanLoading ? 'p-0 border-solid border-slate-900' : 'p-4'}`}>
                 {isCameraActive ? (
                   <div className="relative w-full h-[400px] sm:h-[460px] bg-black overflow-hidden flex flex-col justify-between">
                     <video 
@@ -1436,9 +1455,6 @@ export default function App() {
                         <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-red-500 rounded-bl-lg"></div>
                         <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-red-500 rounded-br-lg"></div>
                       </div>
-                      <span className="mt-4 px-3 py-1 bg-black/60 backdrop-blur-xs text-white text-[11px] font-medium rounded-full shadow-md">
-                        Arahkan kamera ke tag harga / produk
-                      </span>
                     </div>
 
                     {/* Top Control Overlay Bar */}
@@ -1474,6 +1490,38 @@ export default function App() {
                         <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-red-600">
                           <Camera size={22} />
                         </div>
+                      </button>
+                    </div>
+                  </div>
+                ) : (capturedImage || scanLoading) ? (
+                  <div className="relative w-full h-[400px] sm:h-[460px] bg-slate-950 overflow-hidden flex flex-col justify-between">
+                    {capturedImage && (
+                      <img 
+                        src={capturedImage} 
+                        alt="Captured Tag" 
+                        className="absolute inset-0 w-full h-full object-cover opacity-90"
+                      />
+                    )}
+                    
+                    {/* Processing Loading Overlay */}
+                    {scanLoading && (
+                      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center p-6 z-20 text-white space-y-3">
+                        <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 backdrop-blur-md flex items-center justify-center">
+                          <RefreshCw size={28} className="animate-spin text-red-500" />
+                        </div>
+                        <div className="text-sm font-bold tracking-wide">Menganalisis Gambar AI...</div>
+                        <p className="text-xs text-slate-300">Membaca tag harga & komparasi Tokopedia</p>
+                      </div>
+                    )}
+
+                    {/* Top Control Bar for Captured View */}
+                    <div className="relative z-10 p-3 bg-gradient-to-b from-black/70 to-transparent flex justify-end text-white">
+                      <button 
+                        onClick={() => { setCapturedImage(null); startCamera(); }}
+                        className="px-3 py-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-xs text-white text-xs font-bold rounded-full transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw size={12} />
+                        <span>Foto Ulang</span>
                       </button>
                     </div>
                   </div>
@@ -1526,25 +1574,19 @@ export default function App() {
                   >
                     ✕
                   </button>
-                  {scannedResult.image_url && (
-                    <div 
-                      onClick={() => setPreviewImageUrl(scannedResult.image_url)}
-                      className="w-full h-36 bg-slate-100 dark:bg-white/5 rounded-xl overflow-hidden border border-slate-200/80 dark:border-white/10 flex items-center justify-center cursor-pointer hover:opacity-90 transition group relative"
-                      title="Klik untuk memperbesar gambar"
-                    >
-                      <img src={scannedResult.image_url} alt="Scanned" className="w-full h-full object-cover group-hover:scale-102 transition duration-300" />
-                      <div className="absolute inset-0 bg-slate-900/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1 backdrop-blur-3xs">
-                        🔍 Perbesar Gambar
-                      </div>
-                    </div>
-                  )}
 
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
-                      <Check size={12} />
-                      AI Terverifikasi
-                    </span>
-                    {scannedResult.confidence != null && <span className="text-xs text-[#5A6E85] dark:text-slate-400">Confidence {scannedResult.confidence}</span>}
+                  <div className="flex items-center justify-between pt-2 pr-10">
+                    <div className="flex flex-col gap-1">
+                      <span className="w-fit px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                        <Check size={12} />
+                        AI Terverifikasi
+                      </span>
+                      {scannedResult.confidence != null && (
+                        <span className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium pl-0.5">
+                          Confidence {scannedResult.confidence}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2 pr-8">
@@ -1599,9 +1641,35 @@ export default function App() {
                     </a>
                   </div>
 
-                  {/* Feedback Correction Input (Collapsible) */}
-                  <div className="space-y-2 pt-1">
-                    <div className="flex justify-end">
+                  <button
+                    onClick={saveScannedResultToHistory}
+                    disabled={scannedResultSaved || scanSaving}
+                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      scannedResultSaved
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
+                        : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
+                    }`}
+                  >
+                    {scanSaving ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Menyimpan ke Server...</span>
+                      </>
+                    ) : scannedResultSaved ? (
+                      <>
+                        <Check size={14} />
+                        <span>Tersimpan di Riwayat Database</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾 Simpan Hasil Scan ke Server & Database</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Feedback Correction Input (Collapsible) - Moved to bottom */}
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 dark:border-white/10">
+                    <div className="flex justify-center">
                       <button
                         type="button"
                         onClick={() => setShowFeedbackForm(prev => !prev)}
@@ -1613,7 +1681,7 @@ export default function App() {
 
                     {showFeedbackForm && (
                       <div className="p-3.5 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-2.5 transition-all">
-                        <div class="flex items-center justify-between">
+                        <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
                             <span>💡 Petunjuk / Koreksi untuk AI</span>
                           </span>
@@ -1697,32 +1765,6 @@ export default function App() {
                       )}
                     </div>
                   )}
-
-                  <button
-                    onClick={saveScannedResultToHistory}
-                    disabled={scannedResultSaved || scanSaving}
-                    className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
-                      scannedResultSaved
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
-                        : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
-                    }`}
-                  >
-                    {scanSaving ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        <span>Menyimpan ke Server...</span>
-                      </>
-                    ) : scannedResultSaved ? (
-                      <>
-                        <Check size={14} />
-                        <span>Tersimpan di Riwayat Database</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>💾 Simpan Hasil Scan ke Server & Database</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               )}
 
@@ -2360,13 +2402,15 @@ export default function App() {
                           <div className="flex items-center justify-between gap-1.5">
                             <div className="text-sm font-bold text-[#0A1937] dark:text-white truncate font-heading">{s.name}</div>
                             {s.openNow !== null && s.openNow !== undefined && (
-                              <span className={`shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                                s.openNow
-                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                              }`}>
-                                {s.openNow ? '🟢 Buka' : '🔴 Tutup'}
-                              </span>
+                              s.openNow ? (
+                                <span className="status-badge-buka shrink-0">
+                                  🟢 Buka
+                                </span>
+                              ) : (
+                                <span className="shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+                                  🔴 Tutup
+                                </span>
+                              )
                             )}
                           </div>
                           <div className="text-xs text-[#5A6E85] dark:text-slate-400 mt-0.5 line-clamp-1">{s.desc}</div>

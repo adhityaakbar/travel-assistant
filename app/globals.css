@@ -13,3 +13,21 @@ h1, h2, h3, .font-heading {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.status-badge-buka {
+  background-color: #22c55e;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  line-height: 1.2;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
+  animation: softGlowCompact 2s infinite;
+}
+
+@keyframes softGlowCompact {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
