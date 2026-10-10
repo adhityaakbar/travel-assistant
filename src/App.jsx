@@ -1765,21 +1765,6 @@ export default function App() {
                       </div>
                     )}
                   </div>
-
-                  {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {scannedResult.tokopedia_url && (
-                        <a href={scannedResult.tokopedia_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs">
-                          Tokopedia <ExternalLink size={14} aria-hidden="true" />
-                        </a>
-                      )}
-                      {scannedResult.shopee_url && (
-                        <a href={scannedResult.shopee_url} target="_blank" rel="noopener noreferrer" className="py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs">
-                          Shopee <ExternalLink size={14} aria-hidden="true" />
-                        </a>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
