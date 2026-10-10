@@ -78,3 +78,19 @@ jobs:
             systemctl reload nginx
             echo '==> Deployment successful!'
           "
+
+      - name: Send Telegram Notification via Devina Bot
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.DEVINA_TELEGRAM_BOT_TOKEN || secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DEVINA_TELEGRAM_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            MESSAGE="🚀 <b>Travel Assistant Deployment Successful!</b>%0A%0A<b>Repo:</b> ${{ github.repository }}%0A<b>Branch:</b> ${{ github.ref_name }}%0A<b>Commit:</b> ${github_short_sha:-${{ github.sha }}}%0A<b>Actor:</b> ${{ github.actor }}%0A<b>Target:</b> LXC g4-apps"
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_CHAT_ID}" \
+              -d "parse_mode=HTML" \
+              -d "text=${MESSAGE}"
+          else
+            echo "Telegram credentials (DEVINA_TELEGRAM_BOT_TOKEN / DEVINA_TELEGRAM_CHAT_ID) not configured in GitHub Secrets."
+          fi
