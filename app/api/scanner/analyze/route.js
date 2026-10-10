@@ -43,7 +43,8 @@ export function createAnalyzeHandler({ analyze = analyzeProductImage, authentica
 
     let analysis;
     try {
-      analysis = await analyze({ imageDataUrl: body.image_data_url });
+      const feedbackPrompt = typeof body?.feedback_prompt === 'string' ? body.feedback_prompt.trim() : undefined;
+      analysis = await analyze({ imageDataUrl: body.image_data_url, feedbackPrompt });
     } catch {
       return NextResponse.json({ error: 'Gagal menganalisis gambar' }, { status: 502 });
     }

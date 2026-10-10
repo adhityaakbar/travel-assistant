@@ -84,12 +84,18 @@ test('provider failure returns 502 and does not insert', async () => {
 
 test('analyzes and returns normalized fields as an un-saved estimate', async () => {
   let analyzedImage;
+  let passedFeedback;
   const response = await handler({
-    analyze: async ({ imageDataUrl: value }) => { analyzedImage = value; return analysis; },
-  })(request({ image_data_url: imageDataUrl }));
+    analyze: async ({ imageDataUrl: value, feedbackPrompt }) => { 
+      analyzedImage = value; 
+      passedFeedback = feedbackPrompt;
+      return analysis; 
+    },
+  })(request({ image_data_url: imageDataUrl, feedback_prompt: 'Rayban Wayfarer' }));
 
   assert.equal(response.status, 200);
   assert.equal(analyzedImage, imageDataUrl);
+  assert.equal(passedFeedback, 'Rayban Wayfarer');
   const data = await response.json();
   assert.equal(data.success, true);
   assert.equal(data.item.product_name, analysis.product_name);

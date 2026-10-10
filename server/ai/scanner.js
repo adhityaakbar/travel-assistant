@@ -85,7 +85,7 @@ export function normalizeScannerAnalysis(content) {
   };
 }
 
-export async function analyzeProductImage({ imageDataUrl }) {
+export async function analyzeProductImage({ imageDataUrl, feedbackPrompt }) {
   const baseUrl = process.env.OPENAI_BASE_URL;
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
@@ -121,7 +121,7 @@ export async function analyzeProductImage({ imageDataUrl }) {
         messages: [{
           role: 'user',
           content: [
-            { type: 'text', text: 'Analyze this product image. Return only valid JSON with keys: product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note. Use null for unknown values. Prices are non-negative estimates. product_name must always be a non-empty descriptive string; if image is unclear, use "Unknown Product".' },
+            { type: 'text', text: `Analyze this product image. Return only valid JSON with keys: product_name, brand, model, price_jpy, lowest_price_idr, average_price_idr, currency, marketplace, marketplace_url, tokopedia_url, shopee_url, confidence, estimate_note. Use null for unknown values. Prices are non-negative estimates. product_name must always be a non-empty descriptive string; if image is unclear, use "Unknown Product".${feedbackPrompt ? ` Note/Correction from user: "${feedbackPrompt}". Consider this user feedback for more accurate product identification.` : ''}` },
             { type: 'image_url', image_url: { url: imageDataUrl } },
           ],
         }],

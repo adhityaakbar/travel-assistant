@@ -126,6 +126,9 @@ export default function App() {
   const [scanError, setScanError] = useState('');
   const [scanSaving, setScanSaving] = useState(false);
   const [scannedResultSaved, setScannedResultSaved] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackPromptText, setFeedbackPromptText] = useState('');
+  const [reanalyzing, setReanalyzing] = useState(false);
 
   // Ngobrol State
   const [selectedPhraseCategory, setSelectedPhraseCategory] = useState('Semua');
@@ -672,6 +675,40 @@ export default function App() {
       ]);
     } finally {
       setScanSaving(false);
+    }
+  };
+
+  const handleReanalyze = async () => {
+    if (!scannedResult?.image_url || reanalyzing) return;
+    setReanalyzing(true);
+    setScanError('');
+    const authToken = getAuthToken();
+    try {
+      const res = await axios.post('/api/scanner/analyze', {
+        image_data_url: scannedResult.image_url,
+        latitude: scannedResult.latitude,
+        longitude: scannedResult.longitude,
+        location_name: scannedResult.location_name,
+        feedback_prompt: feedbackPromptText,
+      }, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}
+      });
+      if (res.data?.success && res.data?.item) {
+        setScannedResult({
+          ...res.data.item,
+          image_url: scannedResult.image_url,
+          latitude: scannedResult.latitude,
+          longitude: scannedResult.longitude,
+          location_name: scannedResult.location_name,
+        });
+        setScannedResultSaved(false);
+        setShowFeedbackForm(false);
+        setFeedbackPromptText('');
+      }
+    } catch (err) {
+      setScanError(err.response?.data?.error || 'Gagal analisis ulang gambar.');
+    } finally {
+      setReanalyzing(false);
     }
   };
 
@@ -1483,8 +1520,9 @@ export default function App() {
                 <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
                   <button
                     onClick={() => { setScannedResult(null); setScannedResultSaved(false); }}
-                    className="absolute top-3 right-3 w-7 h-7 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-xs font-bold transition z-10 cursor-pointer"
-                    title="Tutup / Hapus Hasil Scan"
+                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/80 active:scale-90 text-white flex items-center justify-center text-xs font-semibold backdrop-blur-md border border-white/20 transition-all z-10 cursor-pointer shadow-md"
+                    title="Tutup Hasil Scan"
+                    aria-label="Tutup Hasil Scan"
                   >
                     ✕
                   </button>
@@ -1537,9 +1575,9 @@ export default function App() {
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-stretch gap-2">
                     {scannedResult.location_name && (
-                      <div className="flex items-center gap-1 text-[11px] text-[#5A6E85] dark:text-slate-300 bg-slate-100 dark:bg-white/10 px-2.5 py-1 rounded-md font-medium">
+                      <div className="flex items-center gap-1.5 text-[11px] text-[#5A6E85] dark:text-slate-300 bg-slate-100 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 px-2.5 py-1.5 rounded-md font-medium">
                         <span className="text-xs">{getCountryFlagFromCoords(scannedResult.latitude, scannedResult.longitude, scannedResult.location_name)}</span>
                         <MapPin size={12} className="text-emerald-600 dark:text-emerald-400" />
                         <span>{scannedResult.location_name}</span>
@@ -1553,12 +1591,73 @@ export default function App() {
                       }
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1 rounded-md font-semibold transition cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1.5 rounded-md font-semibold transition cursor-pointer"
                       title="Buka Lokasi Scan di Google Maps"
                     >
                       <MapPin size={12} className="text-red-600 dark:text-red-400" />
                       <span>📍 Buka GPS di Maps ↗</span>
                     </a>
+                  </div>
+
+                  {/* Feedback Correction Input (Collapsible) */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowFeedbackForm(prev => !prev)}
+                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>✏️ AI Salah Analisis? Koreksi Produk</span>
+                      </button>
+                    </div>
+
+                    {showFeedbackForm && (
+                      <div className="p-3.5 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-2.5 transition-all">
+                        <div class="flex items-center justify-between">
+                          <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                            <span>💡 Petunjuk / Koreksi untuk AI</span>
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={() => setShowFeedbackForm(false)} 
+                            title="Batal koreksi"
+                            aria-label="Batal koreksi"
+                            className="w-6 h-6 rounded-full hover:bg-blue-500/20 active:scale-90 text-blue-800 dark:text-blue-300 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            value={feedbackPromptText}
+                            onChange={(e) => setFeedbackPromptText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleReanalyze(); }}
+                            placeholder="Contoh: Ini Kacamata Rayban Wayfarer..."
+                            className="flex-1 text-xs px-3 py-2 bg-white dark:bg-[#0A1937] border border-blue-300 dark:border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-white"
+                          />
+                          <button 
+                            type="button"
+                            onClick={handleReanalyze}
+                            disabled={reanalyzing}
+                            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+                          >
+                            {reanalyzing ? (
+                              <>
+                                <RefreshCw size={13} className="animate-spin" />
+                                <span>Menganalisis...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>✨</span>
+                                <span>Analisis Ulang</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
