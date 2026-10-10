@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant — Refined Collapsible Valas Chart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#060B14',
+              card: '#0D1627',
+              border: 'rgba(255, 255, 255, 0.08)',
+              red: '#FF0025',
+              orange: '#FDA22B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #060B14; color: #f8fafc; font-family: "Plus Jakarta Sans", sans-serif; }
+    .card-glass { background: #0D1627; border: 1px solid rgba(255, 255, 255, 0.08); transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .tf-btn { transition: all 0.2s ease; cursor: pointer; }
+    .tf-btn.active { background: #FF0025; color: #ffffff; font-weight: 700; box-shadow: 0 0 12px rgba(255, 0, 37, 0.4); }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 max-w-md mx-auto space-y-4">
+
+  <!-- Header Section -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-base font-bold text-white flex items-center gap-2">
+        💱 Valas & Exchange Rate
+      </h1>
+      <p class="text-xs text-slate-400">Refined Clean Collapsible Concept</p>
+    </div>
+    <span class="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">SUPERPOWERS UI v2</span>
+  </div>
+
+  <!-- REFINED COLLAPSIBLE CHART CONTAINER (TANPA BENDERA, POSISI RATE LEBIH INTEGRATED) -->
+  <div id="chartContainer" class="card-glass rounded-2xl p-4 space-y-3 relative overflow-hidden">
+
+    <!-- Header Section (Clean: No Flag, Rate Integrated Inline) -->
+    <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleChart()">
+      <!-- Left: Currency Pair Title & Badges -->
+      <div class="flex items-center gap-2">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-base font-extrabold text-white font-mono tracking-tight">JPY / IDR</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 bg-white/10 text-slate-300 rounded-md font-semibold">7D</span>
+          </div>
+          <div class="text-[11px] text-slate-400 font-mono mt-0.5">Japanese Yen</div>
+        </div>
+      </div>
+
+      <!-- Right: Rate & Toggle Button Stack -->
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <div class="text-base font-extrabold text-white font-mono">Rp 112,99</div>
+          <div class="text-[11px] font-bold text-red-400 font-mono flex items-center justify-end gap-0.5">
+            <span>▼</span> -0.75%
+          </div>
+        </div>
+
+        <!-- Single Toggle Button -->
+        <button id="toggleBtn" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition flex items-center gap-1">
+          <span id="toggleText" class="text-[10px] font-mono font-semibold text-slate-400">Tutup</span>
+          <svg id="chevronIcon" class="w-4 h-4 transform transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- VERSI SINGKAT / COMPACT SPARKLINE (Dihapus button "Buka Grafik" yang duplikat) -->
+    <div id="compactView" class="hidden pt-2 border-t border-white/5 flex items-center justify-between">
+      <span class="text-[10px] font-mono text-slate-400">Mini Sparkline (7D)</span>
+      <!-- Sparkline Full Width Fit -->
+      <svg class="w-48 h-6" viewBox="0 0 160 20" fill="none">
+        <path d="M0,18 L25,12 L50,15 L75,5 L100,12 L125,8 L160,15" stroke="#FF0025" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- VERSI LENGKAP / EXPANDED BODY -->
+    <div id="expandedBody" class="space-y-4 pt-2 border-t border-white/5 transition-all">
+
+      <!-- Timeframe Selector Pills -->
+      <div class="flex items-center justify-between bg-black/40 p-1 rounded-xl border border-white/5 text-xs font-mono">
+        <button class="tf-btn active px-2 py-1 rounded-lg text-white font-bold">7D</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">14D</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">1M</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">3M</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">6M</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">1Y</button>
+        <button class="tf-btn px-2 py-1 rounded-lg text-slate-400 hover:text-white">2Y</button>
+      </div>
+
+      <!-- Main Graph Plot -->
+      <div class="relative">
+        <svg class="w-full h-32" viewBox="0 0 320 100" fill="none">
+          <defs>
+            <linearGradient id="chartGradRed2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FF0025" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#FF0025" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="20" x2="320" y2="20" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+          <line x1="0" y1="50" x2="320" y2="50" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+          <line x1="0" y1="80" x2="320" y2="80" stroke="white" stroke-opacity="0.05" stroke-dasharray="3 3"/>
+          <path d="M 10,25 L 60,45 L 110,35 L 160,85 L 210,50 L 260,65 L 310,75 L 310,95 L 10,95 Z" fill="url(#chartGradRed2)" />
+          <path d="M 10,25 L 60,45 L 110,35 L 160,85 L 210,50 L 260,65 L 310,75" stroke="#FF0025" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+
+        <div class="flex justify-between text-[9px] font-mono text-slate-400 pt-1">
+          <span>2026-10-02</span>
+          <span>2026-10-09</span>
+        </div>
+      </div>
+
+      <!-- Data Stats Grid -->
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-white/5 p-2 rounded-xl border border-white/5">
+          <div class="text-[8px] text-slate-400 uppercase font-mono">Rate Awal</div>
+          <div class="text-xs font-bold text-slate-200 font-mono mt-0.5">Rp 113,84</div>
+        </div>
+        <div class="bg-white/5 p-2 rounded-xl border border-white/5">
+          <div class="text-[8px] text-slate-400 uppercase font-mono">Rate Tertinggi</div>
+          <div class="text-xs font-bold text-emerald-400 font-mono mt-0.5">Rp 113,84</div>
+        </div>
+        <div class="bg-white/5 p-2 rounded-xl border border-white/5">
+          <div class="text-[8px] text-slate-400 uppercase font-mono">Data Points</div>
+          <div class="text-xs font-bold text-slate-200 font-mono mt-0.5">6 Hari</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let isExpanded = true;
+
+    function toggleChart() {
+      const expandedBody = document.getElementById('expandedBody');
+      const compactView = document.getElementById('compactView');
+      const chevronIcon = document.getElementById('chevronIcon');
+      const toggleText = document.getElementById('toggleText');
+
+      isExpanded = !isExpanded;
+
+      if (isExpanded) {
+        expandedBody.classList.remove('hidden');
+        compactView.classList.add('hidden');
+        chevronIcon.classList.remove('-rotate-180');
+        toggleText.textContent = 'Tutup';
+      } else {
+        expandedBody.classList.add('hidden');
+        compactView.classList.remove('hidden');
+        chevronIcon.classList.add('-rotate-180');
+        toggleText.textContent = 'Buka';
+      }
+    }
+  </script>
+
+</body>
+</html>
