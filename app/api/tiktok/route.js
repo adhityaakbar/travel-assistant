@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server.js';
 import { query as defaultQuery } from '../../../server/db.js';
 import puppeteer from 'puppeteer-core';
 

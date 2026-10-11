@@ -16,6 +16,7 @@ export const CATEGORY_TYPES = {
   gadget: ['electronics_store', 'cell_phone_store'],
   water: ['drinking_water', 'water_fountain', 'point_of_interest', 'park'],
   attraction: ['tourist_attraction', 'park', 'museum'],
+  radar: ['tourist_attraction', 'point_of_interest', 'park'],
   foto: ['historical_landmark', 'point_of_interest', 'tourist_attraction'],
   hiburan: ['amusement_park', 'movie_theater', 'bowling_alley', 'night_club'],
 };
@@ -35,6 +36,7 @@ const LEGACY_CATEGORIES = {
   water: 'water',
   drinking_water: 'water',
   atraksi: 'attraction',
+  radar: 'radar',
   photo: 'foto',
   picture: 'foto',
   entertainment: 'hiburan',
