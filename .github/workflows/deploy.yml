@@ -67,6 +67,9 @@ jobs:
               git reset --hard origin/main
             fi
 
+            echo '==> Cleaning old build cache (.next)...'
+            rm -rf .next
+
             echo '==> Installing dependencies & building...'
             npm install
             APP_SECRET=\${APP_SECRET:-guardian8} JWT_SECRET=\${JWT_SECRET:-guardian8} npm run build
