@@ -83,18 +83,20 @@ test('sorts places nearest first', async () => {
   assert.ok(body.places[0].distKm < body.places[1].distKm);
 });
 
-test('provider empty result completes up to 20 spots from curated spots', async () => {
-  const response = await handler({ apiKey: 'test-key', searchPlaces: async () => [] })(request('?lat=35&lng=139&category=all'));
+test('provider empty result returns empty list without curated fallback', async () => {
+  const emptyHandler = createNearbyHandler({ apiKey: 'test-key', searchPlaces: async () => [], dbQuery: null });
+  const response = await emptyHandler(request('?lat=35&lng=139&category=all'));
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.source, 'curated');
-  assert.ok(body.places.length > 0);
+  assert.equal(body.count, 0);
+  assert.deepEqual(body.places, []);
 });
 
-test('provider failure falls back gracefully to curated spots', async () => {
-  const response = await handler({ apiKey: 'fake_key', searchPlaces: async () => { throw new Error('secret provider detail'); } })(request('?lat=35.001&lng=139&category=all'));
+test('provider failure returns empty result without curated fallback', async () => {
+  const failHandler = createNearbyHandler({ apiKey: 'test-key', searchPlaces: async () => { throw new Error('secret provider detail'); }, dbQuery: null });
+  const response = await failHandler(request('?lat=35.001&lng=139&category=all'));
   assert.equal(response.status, 200);
   const body = await response.json();
-  assert.equal(body.source, 'curated');
-  assert.ok(body.places.length > 0);
+  assert.equal(body.count, 0);
+  assert.deepEqual(body.places, []);
 });

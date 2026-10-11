@@ -150,13 +150,13 @@
 - Missing coordinates return 400; no implicit Shibuya fallback.
 - `normalizeCategory` maps legacy values `kopi→coffee`, `eat→food`, `thrift→shopping`, `attraction→gadget`.
 
-- [ ] Write failing route/helper tests for missing coordinates, each category, empty provider result, distance sorting, and no initial fallback.
-- [ ] Run tests and observe current default coordinates/category mismatch.
-- [ ] Normalize curated/provider categories and filter after normalization; preserve distance sorting.
-- [ ] Make provider failure return safe empty result or explicitly labeled local results only after valid GPS coordinates; never return spots before GPS.
-- [ ] Update UI initial list to `[]`; GPS click requests location, sends coordinates, and displays permission/provider errors.
-- [ ] Add category selector; changing category reloads only after location exists.
-- [ ] Run focused tests and build.
+- [x] Write failing route/helper tests for missing coordinates, each category, empty provider result, distance sorting, and no initial fallback.
+- [x] Run tests and observe current default coordinates/category mismatch.
+- [x] Normalize curated/provider categories and filter after normalization; preserve distance sorting.
+- [x] Make provider failure return safe empty result or explicitly labeled local results only after valid GPS coordinates; never return spots before GPS.
+- [x] Update UI initial list to `[]`; GPS click requests location, sends coordinates, and displays permission/provider errors.
+- [x] Add category selector; changing category reloads only after location exists.
+- [x] Run focused tests and build.
 
 ### Task 7: Integrated runtime verification
 

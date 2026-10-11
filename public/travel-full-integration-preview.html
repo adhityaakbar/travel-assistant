@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant v1.6.0 — Full TikTok Trend Gap Integrated Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#060B14',
+              card: '#0D1627',
+              border: 'rgba(255, 255, 255, 0.08)',
+              red: '#FF0025',
+              orange: '#FDA22B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #060B14; color: #f8fafc; font-family: "Plus Jakarta Sans", sans-serif; }
+    .card-glass { background: #0D1627; border: 1px solid rgba(255, 255, 255, 0.08); }
+    
+    /* UI-UX Pro-Max Pulse Dot (Linear/Vercel Style) */
+    .pulse-dot-green {
+      position: relative;
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background-color: #22c55e;
+      border-radius: 9999px;
+    }
+    .pulse-dot-green::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      width: 12px;
+      height: 12px;
+      border-radius: 9999px;
+      background-color: rgba(34, 197, 94, 0.4);
+      animation: vercelPulse 2s infinite ease-out;
+    }
+
+    .pulse-dot-red {
+      position: relative;
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background-color: #FF0025;
+      border-radius: 9999px;
+    }
+    .pulse-dot-red::after {
+      content: '';
+      position: absolute;
+      top: -3px;
+      left: -3px;
+      width: 12px;
+      height: 12px;
+      border-radius: 9999px;
+      background-color: rgba(255, 0, 37, 0.4);
+      animation: vercelPulse 2s infinite ease-out;
+    }
+
+    @keyframes vercelPulse {
+      0% { transform: scale(0.8); opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* Pro-Max Outer Glow Radar Pill */
+    .glow-pill-green {
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .glow-pill-red {
+      box-shadow: 0 0 12px rgba(255, 0, 37, 0.25);
+      border: 1px solid rgba(255, 0, 37, 0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 max-w-md mx-auto space-y-4 pb-24">
+
+  <!-- TOP APP BAR WITH WEATHER & GPS -->
+  <div class="flex items-center justify-between border-b border-white/10 pb-3">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center font-black text-white text-xs shadow-lg shadow-red-500/20">
+        TA
+      </div>
+      <div>
+        <h1 class="text-sm font-extrabold text-white tracking-tight">Travel Assistant</h1>
+        <p class="text-[10px] text-slate-400 font-mono">v1.6.0 • TikTok Trend Engine</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2 px-2.5 py-1 bg-white/5 border border-white/10 rounded-full text-[10px] font-mono text-slate-300">
+      <span class="pulse-dot-green"></span>
+      <span class="ml-1 font-bold">Namba, Osaka</span>
+    </div>
+  </div>
+
+  <!-- INTEGRATED SEARCH & SMART TRIGGER BAR -->
+  <div class="relative">
+    <input type="text" placeholder="🔍 Cari tempat tersembunyi / tanya Bintang AI..." class="w-full bg-[#0D1627] border border-white/10 rounded-2xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#FF0025]">
+    <button class="absolute right-2 top-2 px-3 py-1.5 bg-[#FF0025] hover:bg-red-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-md shadow-red-500/30">
+      <span>AI Search</span>
+    </button>
+  </div>
+
+  <!-- MAIN TAB SELECTOR (EXISTING APP STRUCTURE) -->
+  <div class="flex bg-black/40 p-1 rounded-xl border border-white/5 text-xs font-mono text-center">
+    <button onclick="switchTab('kalcer')" id="tab-kalcer" class="flex-1 py-2 rounded-lg bg-[#FF0025] text-white font-bold transition shadow-md shadow-red-500/20">
+      📍 Kalcer Map
+    </button>
+    <button onclick="switchTab('ngobrol')" id="tab-ngobrol" class="flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition">
+      💬 Ngobrol AI
+    </button>
+    <button onclick="switchTab('valas')" id="tab-valas" class="flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition">
+      💱 Valas
+    </button>
+  </div>
+
+  <!-- VIEW TAB 1: KALCER MAP INTEGRATION (POLA 2 - PRE-CALCULATED TIKTOK HEATMAP) -->
+  <div id="view-kalcer" class="space-y-3">
+    
+    <!-- Filter Category Pills -->
+    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar text-[11px] font-mono">
+      <button class="px-3 py-1 bg-white/10 text-white font-bold rounded-lg whitespace-nowrap border border-white/20">🔥 TikTok Trend Gap</button>
+      <button class="px-3 py-1 bg-black/40 text-slate-400 rounded-lg whitespace-nowrap border border-white/5">☕ Hidden Cafe</button>
+      <button class="px-3 py-1 bg-black/40 text-slate-400 rounded-lg whitespace-nowrap border border-white/5">🍜 Kuliner Lokal</button>
+    </div>
+
+    <!-- Interactive Spot Heatmap Component -->
+    <div class="card-glass rounded-2xl p-3 space-y-3 relative">
+      <div class="flex items-center justify-between text-[10px] font-mono">
+        <span class="text-slate-400 flex items-center gap-1.5">
+          <span class="pulse-dot-green"></span>
+          <span class="text-white font-bold">TikTok Gap Radar (Osaka)</span>
+        </span>
+        <span class="text-slate-500">Updated 2h ago</span>
+      </div>
+
+      <!-- Map Mockup Canvas -->
+      <div class="h-48 bg-slate-900 rounded-xl relative overflow-hidden border border-white/10 flex items-center justify-center">
+        <!-- Grid Dots Background -->
+        <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 16px 16px;"></div>
+
+        <!-- Marker 1: Hidden Gem (Kissa Yamatoya) -->
+        <div class="absolute top-10 left-12 cursor-pointer group">
+          <div class="flex items-center gap-1.5 px-2.5 py-1 bg-black/90 rounded-full glow-pill-green text-[10px] font-mono">
+            <span class="pulse-dot-green"></span>
+            <span class="text-emerald-400 font-bold">Kissa Yamatoya</span>
+            <span class="text-[9px] bg-emerald-500/20 px-1.5 py-0.2 rounded text-emerald-300 font-bold">88</span>
+          </div>
+        </div>
+
+        <!-- Marker 2: Crowded Spot (Dotonbori) -->
+        <div class="absolute bottom-12 right-14 cursor-pointer group">
+          <div class="flex items-center gap-1.5 px-2.5 py-1 bg-black/90 rounded-full glow-pill-red text-[10px] font-mono">
+            <span class="pulse-dot-red"></span>
+            <span class="text-red-400 font-bold">Dotonbori</span>
+            <span class="text-[9px] bg-red-500/20 px-1.5 py-0.2 rounded text-red-300 font-bold">20</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendation Cards List -->
+      <div class="space-y-2 pt-1">
+        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+          <span>SPOT TREND GAP HIGHEST</span>
+          <span class="text-emerald-400">High Intent / Low Content</span>
+        </div>
+
+        <!-- Card Item -->
+        <div class="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 transition flex items-center justify-between">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-white">☕ Kissa Yamatoya Coffee</span>
+              <span class="px-1.5 py-0.2 text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded font-mono font-bold">GAP 88</span>
+            </div>
+            <p class="text-[10px] text-slate-400">Namba, Osaka • Search 14.2k vs 12 Videos</p>
+          </div>
+          <button class="px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-mono font-bold hover:bg-emerald-500/20">
+            Rute
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- VIEW TAB 2: NGOBROL AI INTEGRATION (POLA 1 - DIRECT SEARCH HYBRID CHAT) -->
+  <div id="view-ngobrol" class="hidden space-y-3">
+    <div class="card-glass rounded-2xl p-3 space-y-3 h-96 flex flex-col justify-between">
+      
+      <!-- Chat Messages List -->
+      <div class="space-y-3 text-xs overflow-y-auto pr-1">
+        <!-- User Bubble -->
+        <div class="flex justify-end">
+          <div class="bg-[#FF0025] text-white p-3 rounded-2xl rounded-tr-xs max-w-[85%] shadow-md">
+            Bintang, cariin spot kopi hidden gem di Osaka dong yang gak rame turis! ☕
+          </div>
+        </div>
+
+        <!-- AI Extraction Status Badge -->
+        <div class="flex items-center gap-2 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+          <span class="pulse-dot-green"></span>
+          <span>Intent: Hidden Cafe Osaka • Filter: Gap Ratio Score > 75</span>
+        </div>
+
+        <!-- AI Response Bubble with Embedded Interactive Card -->
+        <div class="flex justify-start">
+          <div class="bg-[#131F37] text-slate-200 p-3 rounded-2xl rounded-tl-xs max-w-[92%] space-y-2 border border-white/10">
+            <p>Nih bro, berdasarkan analisa trend pencarian TikTok vs jumlah video, spot ini paling pas buat kamu:</p>
+
+            <!-- Embedded Spot Card -->
+            <div class="bg-black/50 p-2.5 rounded-xl border border-emerald-500/30 space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-white text-xs">☕ Kissa Yamatoya</span>
+                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-mono font-bold rounded-full">SCORE 88</span>
+              </div>
+              <p class="text-[10px] text-slate-400">Pencarian tinggi di TikTok tapi baru 12 video diunggah. Suasana tenang & retro.</p>
+              <button onclick="switchTab('kalcer')" class="w-full py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[10px] font-mono font-bold border border-emerald-500/30 transition flex items-center justify-center gap-1">
+                <span>📍 Buka di Heatmap Peta</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input -->
+      <div class="relative pt-2 border-t border-white/10">
+        <input type="text" placeholder="Tanya Bintang AI..." class="w-full bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500">
+        <button class="absolute right-1 top-3 px-3 py-1 bg-[#FF0025] text-white rounded-lg text-xs font-bold">Kirim</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VIEW TAB 3: VALAS (EXISTING INTEGRATED) -->
+  <div id="view-valas" class="hidden space-y-3">
+    <div class="card-glass rounded-2xl p-4 text-center text-xs text-slate-400">
+      (Tab Valas dengan Sparkline Multi-Timeframe Existing)
+    </div>
+  </div>
+
+  <!-- FIXED BOTTOM NAVIGATION BAR (EXISTING STRUCTURE) -->
+  <div class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-[#060B14]/90 backdrop-blur-md border-t border-white/10 py-2.5 px-6 flex justify-between items-center text-[10px] font-mono text-slate-400">
+    <button onclick="switchTab('valas')" id="nav-valas" class="flex flex-col items-center gap-1 hover:text-white">
+      <span class="text-sm">💱</span>
+      <span>Valas</span>
+    </button>
+    <button class="flex flex-col items-center gap-1 hover:text-white">
+      <span class="text-sm">📷</span>
+      <span>Scanner</span>
+    </button>
+    <button onclick="switchTab('ngobrol')" id="nav-ngobrol" class="flex flex-col items-center gap-1 hover:text-white">
+      <span class="text-sm">💬</span>
+      <span>Ngobrol</span>
+    </button>
+    <button onclick="switchTab('kalcer')" id="nav-kalcer" class="flex flex-col items-center gap-1 text-[#FF0025] font-bold">
+      <span class="text-sm">📍</span>
+      <span>Kalcer</span>
+    </button>
+  </div>
+
+  <script>
+    function switchTab(tabName) {
+      document.getElementById('view-kalcer').classList.add('hidden');
+      document.getElementById('view-ngobrol').classList.add('hidden');
+      document.getElementById('view-valas').classList.add('hidden');
+
+      document.getElementById(`view-${tabName}`).classList.remove('hidden');
+
+      document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+        btn.className = "flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition";
+      });
+      document.getElementById(`tab-${tabName}`).className = "flex-1 py-2 rounded-lg bg-[#FF0025] text-white font-bold transition shadow-md shadow-red-500/20";
+
+      document.querySelectorAll('[id^="nav-"]').forEach(nav => {
+        nav.className = "flex flex-col items-center gap-1 hover:text-white text-slate-400";
+      });
+      document.getElementById(`nav-${tabName}`).className = "flex flex-col items-center gap-1 text-[#FF0025] font-bold";
+    }
+  </script>
+
+</body>
+</html>

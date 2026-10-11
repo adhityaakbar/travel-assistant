@@ -46,10 +46,20 @@ export function parseProviderResponse(content) {
 
 function responseJson(content) {
   const text = typeof content === 'string' ? content.trim() : '';
-  const unfenced = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const unfenced = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```[\s\S]*$/, '').trim();
   try {
     return parseProviderResponse(unfenced);
   } catch {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonCandidate = text.slice(firstBrace, lastBrace + 1);
+      try {
+        return parseProviderResponse(jsonCandidate);
+      } catch {
+        // fall through
+      }
+    }
     throw new Error('AI response was not valid JSON');
   }
 }

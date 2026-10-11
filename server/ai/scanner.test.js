@@ -30,7 +30,7 @@ test('normalizes valid scanner JSON', () => {
 });
 
 test('normalizes fenced JSON and derives missing marketplace search links', () => {
-  const result = normalizeScannerAnalysis('```json\n{"product_name":"Nintendo Switch OLED","price_jpy":null}\n```');
+  const result = normalizeScannerAnalysis('```json\n{"product_name":"Nintendo Switch OLED","price_jpy":null}\n```\nskipped: ML inference pipeline, add when: image valid.');
 
   assert.equal(result.product_name, 'Nintendo Switch OLED');
   assert.equal(result.tokopedia_url, 'https://www.tokopedia.com/search?st=product&q=Nintendo%20Switch%20OLED');

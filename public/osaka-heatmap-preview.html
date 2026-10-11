@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Osaka Real Heatmap — Travel Assistant Prototype</title>
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-heatmap@1.0.0/leaflet-heatmap.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #090d16;
+      color: #f8fafc;
+    }
+    #map {
+      height: 100vh;
+      width: 100%;
+      z-index: 1;
+      background: #0b0f19;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .custom-div-icon {
+      background: transparent;
+      border: none;
+    }
+  </style>
+</head>
+<body class="overflow-hidden flex h-screen w-screen">
+
+  <!-- MAP CONTAINER -->
+  <div class="relative flex-1 h-full">
+    <div id="map"></div>
+
+    <!-- TOP FLOATING HEADER / SEARCH BAR -->
+    <div class="absolute top-4 left-4 right-4 md:left-6 md:w-96 z-[1000] flex flex-col gap-3">
+      <!-- App Brand & Search -->
+      <div class="glass-panel rounded-2xl p-3 shadow-2xl flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-black font-extrabold text-xl shadow-lg shadow-emerald-500/20">
+          <i data-lucide="compass" class="w-6 h-6 text-slate-950"></i>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <span class="font-extrabold text-sm tracking-wide text-white">TRAVEL AI</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Gradient Heatmap</span>
+          </div>
+          <p class="text-xs text-slate-400">Osaka Opportunity Density Map</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAP LEGEND (BOTTOM LEFT) -->
+    <div class="absolute bottom-6 left-4 z-[1000] glass-panel p-3.5 rounded-2xl hidden md:flex flex-col gap-2.5 shadow-2xl border-slate-800">
+      <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Heatmap Intensity Gradient</div>
+      
+      <!-- Gradient Bar -->
+      <div class="w-64 h-3 rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-inner"></div>
+      
+      <div class="flex items-center justify-between text-[11px] font-semibold">
+        <span class="text-emerald-400">🟢 High Gem (Low Saturation)</span>
+        <span class="text-amber-400">🟡 Moderate</span>
+        <span class="text-rose-400">🔴 Tourist Trap</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT SIDEBAR: SPOT DETAIL / LIST PANEL -->
+  <div class="w-full md:w-[420px] h-full glass-panel border-l border-slate-800/80 z-[1000] flex flex-col shadow-2xl">
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+      <div>
+        <h2 class="font-bold text-lg text-white flex items-center gap-2">
+          Osaka Density Feed
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">Calculated via TikTok Creator Search Insights</p>
+      </div>
+    </div>
+
+    <div id="spot-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-3"></div>
+
+    <div class="p-4 border-t border-slate-800 bg-slate-950/60">
+      <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-2.5">
+        <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400"></i>
+        <input type="text" placeholder="Tanya Bintang Travel AI..." class="bg-transparent text-xs text-white placeholder-slate-500 outline-none flex-1">
+        <button class="w-7 h-7 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center font-bold transition">
+          <i data-lucide="arrow-up" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // Data points with Heatmap intensity & cluster points
+    const spots = [
+      { id: "osaka-001", name: "Nakazakicho Vintage Street", district: "Umeda North", category: "HIDDEN_GEM", gapScore: 94.8, lat: 34.7072, lng: 135.5061, searchVol: 142000, videoCount: 12, desc: "RetroShowa era streets with hidden coffee cafes & galleries." },
+      { id: "osaka-002", name: "Taisho Waterfront Izakaya", district: "Taisho Ward", category: "HIDDEN_GEM", gapScore: 91.2, lat: 34.6655, lng: 135.4795, searchVol: 98000, videoCount: 9, desc: "Riverfront local izakaya alley filled with working locals." },
+      { id: "osaka-003", name: "Ura-Namba Underground Speakeasy", district: "Namba South", category: "HIDDEN_GEM", gapScore: 88.5, lat: 34.6640, lng: 135.5035, searchVol: 115000, videoCount: 18, desc: "Hidden behind an old fridge door. Best local craft cocktails." },
+      { id: "osaka-004", name: "Dotonbori Glico Sign", district: "Namba Central", category: "TOURIST_TRAP", gapScore: 14.2, lat: 34.6687, lng: 135.5013, searchVol: 1250000, videoCount: 85400, desc: "Extremely crowded. 45 min queue for photo bridge." },
+      { id: "osaka-005", name: "Shinsekai Tsutenkaku Tower", district: "Tennoji", category: "TOURIST_TRAP", gapScore: 28.6, lat: 34.6525, lng: 135.5063, searchVol: 640000, videoCount: 32100, desc: "Overpriced tourist kushikatsu shops." },
+      { id: "osaka-006", name: "Umeda Sky Building", district: "Umeda North", category: "MODERATE", gapScore: 62.4, lat: 34.7052, lng: 135.4906, searchVol: 410000, videoCount: 8900, desc: "360-degree floating garden rooftop." }
+    ];
+
+    // Heatmap raw data points (adding micro-cluster points around spots for smooth heat density effect)
+    const heatData = [
+      // High Green Gem Cluster (Nakazakicho)
+      { lat: 34.7072, lng: 135.5061, value: 0.9 },
+      { lat: 34.7080, lng: 135.5068, value: 0.85 },
+      { lat: 34.7065, lng: 135.5052, value: 0.8 },
+      { lat: 34.7075, lng: 135.5045, value: 0.75 },
+
+      // Taisho Gem Cluster
+      { lat: 34.6655, lng: 135.4795, value: 0.9 },
+      { lat: 34.6660, lng: 135.4802, value: 0.85 },
+      { lat: 34.6650, lng: 135.4788, value: 0.8 },
+
+      // Ura-Namba Gem Cluster
+      { lat: 34.6640, lng: 135.5035, value: 0.88 },
+      { lat: 34.6645, lng: 135.5042, value: 0.82 },
+
+      // Dotonbori Red Tourist Trap Cluster (High density red)
+      { lat: 34.6687, lng: 135.5013, value: 0.15 },
+      { lat: 34.6692, lng: 135.5020, value: 0.12 },
+      { lat: 34.6682, lng: 135.5005, value: 0.18 },
+      { lat: 34.6685, lng: 135.5030, value: 0.1 },
+
+      // Shinsekai Trap Cluster
+      { lat: 34.6525, lng: 135.5063, value: 0.25 },
+      { lat: 34.6530, lng: 135.5070, value: 0.22 }
+    ];
+
+    const map = L.map('map', { zoomControl: false }).setView([34.6850, 135.4980], 13);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19,
+      subdomains: 'abcd'
+    }).addTo(map);
+
+    // Heatmap config with real smooth gradient blobs
+    const cfg = {
+      "radius": 0.012,
+      "maxOpacity": 0.75,
+      "scaleRadius": true,
+      "useLocalExtremes": false,
+      latField: 'lat',
+      lngField: 'lng',
+      valueField: 'value',
+      gradient: {
+        '0.1': '#ef4444', // Red Tourist Trap
+        '0.3': '#f59e0b', // Yellow Moderate
+        '0.7': '#10b981', // Green Hidden Gem
+        '1.0': '#34d399'  # Emerald Top Gem
+      }
+    };
+
+    const heatmapLayer = new HeatmapOverlay(cfg);
+    heatmapLayer.addTo(map);
+    heatmapLayer.setData({ max: 1, data: heatData });
+
+    // Overlay Subtle Spot Pins on Top of Heatmap
+    spots.forEach(spot => {
+      const isGem = spot.category === 'HIDDEN_GEM';
+      const isTrap = spot.category === 'TOURIST_TRAP';
+      const color = isGem ? '#10b981' : (isTrap ? '#ef4444' : '#f59e0b');
+
+      const circle = L.circleMarker([spot.lat, spot.lng], {
+        radius: 8,
+        fillColor: color,
+        color: '#ffffff',
+        weight: 2,
+        opacity: 0.9,
+        fillOpacity: 0.9
+      }).addTo(map);
+
+      circle.bindTooltip(`<b>${spot.name}</b><br>Score: ${spot.gapScore}/100`, { permanent: false, direction: 'top' });
+      circle.on('click', () => {
+        map.flyTo([spot.lat, spot.lng], 15, { duration: 1 });
+      });
+    });
+
+    // Render Sidebar
+    const container = document.getElementById('spot-list');
+    spots.forEach(spot => {
+      const isGem = spot.category === 'HIDDEN_GEM';
+      const isTrap = spot.category === 'TOURIST_TRAP';
+      const badgeBg = isGem 
+        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+        : (isTrap ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30');
+
+      container.innerHTML += `
+        <div onclick="map.flyTo([${spot.lat}, ${spot.lng}], 15)" class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-slate-700 transition cursor-pointer flex flex-col gap-2">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeBg}">${spot.category}</span>
+              <h3 class="font-bold text-sm text-white mt-1.5">${spot.name}</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-lg font-black ${isGem ? 'text-emerald-400' : 'text-rose-400'}">${spot.gapScore}</span>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400">${spot.desc}</p>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>

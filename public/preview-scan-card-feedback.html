@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan Card Feedback Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#0A1937',
+              gray: '#5A6E85',
+              red: '#FF0025',
+              orange: '#FDA22B'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      color: var(--foreground, #0f172a);
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    @keyframes slideDownFade {
+      from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    .animate-expand {
+      animation: slideDownFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.95); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    .animate-pop {
+      animation: popIn 0.3s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="p-4 max-w-md mx-auto">
+  <!-- Card Container -->
+  <div class="bg-white dark:bg-[#0A1937] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-lg space-y-3.5">
+    
+    <!-- Image Header -->
+    <div class="relative w-full h-48 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800">
+      <img id="cardImage" src="https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=600&auto=format&fit=crop&q=80" alt="Scanned item" class="w-full h-full object-cover" />
+      <button 
+        title="Tutup Hasil Scan"
+        aria-label="Tutup Hasil Scan"
+        class="absolute top-2.5 right-2.5 w-8 h-8 bg-slate-900/60 hover:bg-slate-900/80 active:scale-90 text-white rounded-full flex items-center justify-center text-sm font-semibold backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-md"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- AI Verification Row -->
+    <div class="flex items-center justify-between">
+      <span class="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+        ✓ AI Terverifikasi
+      </span>
+      <span class="text-xs text-slate-500 dark:text-slate-400">Confidence 0.92</span>
+    </div>
+
+    <!-- Product Title & Copy directly next to title -->
+    <div class="flex items-center justify-start gap-2">
+      <h2 id="productTitle" class="text-base font-bold text-slate-900 dark:text-white">Unknown Product</h2>
+      <button onclick="copyTitle()" class="p-1 px-2 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200 dark:border-white/10">
+        📋 <span id="copyText">Salin</span>
+      </button>
+    </div>
+
+    <!-- Location Badges - PERFECTLY ALIGNED -->
+    <div class="flex items-stretch gap-2">
+      <div class="flex-1 flex items-center justify-center gap-1.5 text-[11px] text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 px-2.5 py-1.5 rounded-lg font-medium">
+        <span>🇮🇩 GPS (-6.2453, 106.8523)</span>
+      </div>
+      <button class="flex items-center justify-center gap-1.5 text-[11px] text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1.5 rounded-lg font-semibold transition cursor-pointer shrink-0">
+        <span>📍 Buka GPS di Maps ↗</span>
+      </button>
+    </div>
+
+    <!-- Price Estimates Grid -->
+    <div class="grid grid-cols-2 gap-2 p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
+      <div>
+        <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
+        <div id="priceIdrLow" class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">Tidak tersedia</div>
+      </div>
+      <div>
+        <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">HARGA JEPANG · ESTIMASI AI</div>
+        <div id="priceJpy" class="text-xs font-extrabold text-slate-900 dark:text-white mt-0.5">Tidak terdeteksi</div>
+      </div>
+      <div class="col-span-2 pt-2 border-t border-slate-200 dark:border-white/10">
+        <div class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">RATA-RATA INDONESIA · ESTIMASI AI</div>
+        <div id="priceIdrAvg" class="text-xs font-bold text-slate-800 dark:text-slate-200 mt-0.5">Tidak tersedia</div>
+      </div>
+    </div>
+
+    <!-- AI Description Note -->
+    <p id="estimateNote" class="text-xs text-slate-500 dark:text-slate-400 italic">
+      "Image contains selfie of person, no clear product presented."
+    </p>
+
+    <!-- Feedback Input & Re-analyze Section (Collapsible) -->
+    <div class="space-y-2">
+      <div class="flex justify-end">
+        <button 
+          onclick="toggleFeedbackForm()"
+          id="toggleFeedbackBtn"
+          class="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+        >
+          <span>✏️ AI Salah Analisis? Koreksi Produk</span>
+        </button>
+      </div>
+
+      <div id="feedbackFormContainer" class="hidden p-3.5 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-2.5 transition-all">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+            <span>💡 Petunjuk / Koreksi untuk AI</span>
+          </span>
+          <button 
+            onclick="toggleFeedbackForm()" 
+            title="Batal koreksi"
+            aria-label="Batal koreksi"
+            class="w-6 h-6 rounded-full hover:bg-blue-500/20 active:scale-90 text-blue-800 dark:text-blue-300 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+        
+        <div class="flex gap-2">
+          <input 
+            type="text" 
+            id="feedbackInput"
+            placeholder="Contoh: Ini Kacamata Rayban Wayfarer..."
+            class="flex-1 text-xs px-3 py-2 bg-white dark:bg-[#0A1937] border border-blue-300 dark:border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-white"
+          />
+          <button 
+            onclick="triggerReanalyze()"
+            id="reanalyzeBtn"
+            class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
+          >
+            <span id="btnIcon">✨</span>
+            <span id="btnText">Analisis Ulang</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Marketplace Buttons -->
+    <div class="grid grid-cols-2 gap-2">
+      <button class="py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+        Tokopedia ↗
+      </button>
+      <button class="py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1">
+        Shopee ↗
+      </button>
+    </div>
+
+    <!-- Save Button -->
+    <button class="w-full py-3 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm">
+      💾 Simpan Hasil Scan ke Server & Database
+    </button>
+  </div>
+
+  <script>
+    function toggleFeedbackForm() {
+      const container = document.getElementById('feedbackFormContainer');
+      const toggleBtn = document.getElementById('toggleFeedbackBtn');
+      if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        container.classList.add('animate-expand');
+        toggleBtn.classList.add('hidden');
+      } else {
+        container.classList.add('hidden');
+        container.classList.remove('animate-expand');
+        toggleBtn.classList.remove('hidden');
+      }
+    }
+
+    function copyTitle() {
+      const copyText = document.getElementById('copyText');
+      copyText.innerText = 'Tersalin!';
+      setTimeout(() => copyText.innerText = 'Salin', 2000);
+    }
+
+    function triggerReanalyze() {
+      const input = document.getElementById('feedbackInput');
+      const val = input.value.trim();
+      if (!val) {
+        alert('Masukkan deskripsi/koreksi barang terlebih dahulu.');
+        return;
+      }
+
+      const btnText = document.getElementById('btnText');
+      const btnIcon = document.getElementById('btnIcon');
+      const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+
+      btnText.innerText = 'Menganalisis...';
+      btnIcon.innerHTML = '<span class="inline-block animate-spin">⏳</span>';
+      reanalyzeBtn.disabled = true;
+
+      // Simulate re-analysis result after 1.2s
+      setTimeout(() => {
+        const titleEl = document.getElementById('productTitle');
+        titleEl.innerText = val;
+        titleEl.classList.remove('animate-pop');
+        void titleEl.offsetWidth; // trigger reflow
+        titleEl.classList.add('animate-pop');
+
+        document.getElementById('priceIdrLow').innerText = 'Rp 1.850.000';
+        document.getElementById('priceJpy').innerText = '¥ 18.500';
+        document.getElementById('priceIdrAvg').innerText = 'Rp 2.100.000';
+        document.getElementById('estimateNote').innerText = `"Hasil re-analisis berdasarkan koreksi: ${val}"`;
+
+        btnText.innerText = 'Selesai ✓';
+        btnIcon.innerText = '✨';
+
+        setTimeout(() => {
+          btnText.innerText = 'Analisis Ulang';
+          btnIcon.innerText = '✨';
+          reanalyzeBtn.disabled = false;
+        }, 1500);
+      }, 1200);
+    }
+  </script>
+</body>
+</html>

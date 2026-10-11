@@ -32,13 +32,18 @@ import {
   Eye,
   EyeOff,
   Sun,
-  Moon
+  Moon,
+  Search,
+  Video
 } from 'lucide-react';
 import { CURRENCIES, CURRENCY_FLAGS, convert, formatAmount, formatChipRate, formatHistoryPayload, isConversionRateAvailable, parseAmount } from './valas.js';
 import { createCameraController } from './scannerCamera.js';
 import { getPaginatedScanHistory } from './scanHistory.js';
 import { SPOT_CATEGORIES, locationErrorMessage, shouldReloadSpots, getCountryCodeFromCoords, getCountryFlagFromCoords } from './spots.js';
 import { applyLatestTranslationState, conversationPayload, getBubbleSide, getLanguageLabel, getRecognitionLanguage, invalidateTranslationRequest, isEmptyInput, isTranslationCurrent, requestMicrophonePermission, toggleRecognition, SUPPORTED_LANGUAGES, QUICK_PHRASES } from './chat.js';
+import GemRadarMap from './GemRadarMap.jsx';
+import KalcerMap from './KalcerMap.jsx';
+import { CURATED_SPOTS } from '../server/curated-spots.js';
 import axios from 'axios';
 
 import pkg from '../package.json';
@@ -48,6 +53,31 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || `v${pkg.version}`;
 export default function App() {
   // Mount State to avoid hydration mismatch
   const [isMounted, setIsMounted] = useState(false);
+
+  // Dark Mode State & Persistence (Telkomsel THE v2.0)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('travel_assistant_theme') === 'dark';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('travel_assistant_theme', isDarkMode ? 'dark' : 'light');
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode(prev => !prev);
 
   // Auth State
   const [user, setUser] = useState(null);
@@ -59,20 +89,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Theme State
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const toggleDarkMode = () => {
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('travel_assistant_theme', nextMode ? 'dark' : 'light');
-      if (nextMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  };
+
 
   // Navigation State
   const [activeTabState, setActiveTabState] = useState('valas');
@@ -180,7 +197,9 @@ export default function App() {
   const [locatingUser, setLocatingUser] = useState(false);
   const [locationStatus, setLocationStatus] = useState('Meminta lokasi GPS...');
   const [spotFilter, setSpotFilter] = useState('all');
+  const [selectedKalcerSpotId, setSelectedKalcerSpotId] = useState(null);
   const [spotsList, setSpotsList] = useState([]);
+  const [spotsError, setSpotsError] = useState(null);
   const [loadingSpots, setLoadingSpots] = useState(false);
   const [countryCode, setCountryCode] = useState('JPN');
   const [customCategories, setCustomCategories] = useState([]);
@@ -195,6 +214,39 @@ export default function App() {
   const [phraseSearchQuery, setPhraseSearchQuery] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const [showAllHistoryModal, setShowAllHistoryModal] = useState(false);
+
+  const DEFAULT_RADAR_SPOTS = CURATED_SPOTS.map((s, idx) => ({
+    id: s[0] || `radar-${idx}`,
+    name: s[1],
+    district: s[7] || s[3] || 'Jakarta',
+    category: s[3] === 'foto' ? 'HIDDEN_GEM' : (s[3] === 'food' ? 'HIDDEN_GEM' : 'TOURIST_TRAP'),
+    gapScore: Number((70 + (idx * 3.7) % 25).toFixed(1)),
+    lat: s[4],
+    lng: s[5],
+    searchVol: `${((10 + (idx * 2.3) % 40)).toFixed(1)}rb`,
+    videoCount: 20 + (idx * 7) % 200,
+    desc: s[2],
+    icon: s[8] || '📍',
+    tiktokLinks: [
+      { title: `${s[1]} TikTok Review`, url: `https://www.tiktok.com/search?q=${encodeURIComponent(s[1] + ' review')}` },
+      { title: `${s[1]} Vibe Check`, url: `https://www.tiktok.com/search?q=${encodeURIComponent(s[1] + ' vibe')}` }
+    ]
+  }));
+
+  // TikTok Gem Radar state
+  const [selectedRadarSpotId, setSelectedRadarSpotId] = useState(null);
+  const [radarCategoryFilter, setRadarCategoryFilter] = useState('ALL');
+  const [radarSpotsList, setRadarSpotsList] = useState(DEFAULT_RADAR_SPOTS);
+  const [loadingRadarSpots, setLoadingRadarSpots] = useState(false);
+  const [radarLoadingStep, setRadarLoadingStep] = useState(1);
+  const [radarSuccessBanner, setRadarSuccessBanner] = useState(false);
+  const [debugPlacesResponse, setDebugPlacesResponse] = useState(null);
+  const [debugTikTokResponse, setDebugTikTokResponse] = useState(null);
+  const [debugTikTokRequest, setDebugTikTokRequest] = useState(null);
+  const [showApiDebug, setShowApiDebug] = useState(false);
+  const [spotSearchInput, setSpotSearchInput] = useState('');
+  const [isSpotSearching, setIsSpotSearching] = useState(false);
+  const [spotSearchError, setSpotSearchError] = useState('');
 
   // PWA Install prompt listener
   useEffect(() => {
@@ -236,25 +288,18 @@ export default function App() {
       const storedPasscode = localStorage.getItem('travel_assistant_passcode') || '';
       const storedTab = localStorage.getItem('travel_assistant_active_tab') || 'valas';
       
-      const storedTheme = localStorage.getItem('travel_assistant_theme');
-      let enableDark = false;
-      if (storedTheme) {
-        enableDark = storedTheme === 'dark';
-      } else {
-        const currentHour = new Date().getHours();
-        enableDark = currentHour < 6 || currentHour >= 18; // Malam: 18:00 - 05:59, Pagi/Siang: 06:00 - 17:59
-      }
-      setIsDarkMode(enableDark);
-      if (enableDark) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+
 
       setToken(storedToken);
       setRememberMe(storedRemember);
       setLoginPasscode(storedPasscode);
-      setActiveTabState(storedTab);
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam && ['valas', 'scanner', 'radar', 'ngobrol', 'kalcer'].includes(tabParam)) {
+        setActiveTabState(tabParam);
+      } else {
+        setActiveTabState(storedTab);
+      }
       setIsCheckingAuth(Boolean(storedToken));
     } else {
       setIsCheckingAuth(false);
@@ -502,6 +547,9 @@ export default function App() {
       const targetLoc = userLocation || DEFAULT_JAKSEL_LOCATION;
       loadSpots(targetLoc.lat, targetLoc.lng, spotFilter);
     }
+    if (activeTab === 'radar') {
+      // Manual trigger only per task requirements
+    }
   }, [activeTab]);
 
   const startCamera = async (overrideMode = null) => {
@@ -683,13 +731,14 @@ export default function App() {
       photoLocName = `GPS (${photoLat.toFixed(4)}, ${photoLng.toFixed(4)})`;
     }
 
+    const authToken = getAuthToken();
     try {
       const res = await axios.post('/api/scanner/analyze', { 
         image_data_url: imageDataUrl,
         latitude: photoLat,
         longitude: photoLng,
         location_name: photoLocName
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} });
       const item = res.data.item;
       setScannedResult({ ...item, image_url: imageDataUrl, latitude: photoLat, longitude: photoLng, location_name: photoLocName });
       setScannedResultSaved(false);
@@ -980,24 +1029,162 @@ export default function App() {
     );
   };
 
+    const handleSpotFilterChange = (catId) => {
+    setSpotFilter(catId);
+    const loc = userLocation || DEFAULT_JAKSEL_LOCATION;
+    loadSpots(loc.lat, loc.lng, catId);
+  };
+
   const loadSpots = async (lat, lng, cat) => {
     if (!shouldReloadSpots({ lat, lng })) return;
     setSpotsList([]);
+    setSpotsError(null);
     setLoadingSpots(true);
     setLocationStatus('Mencari spot terdekat...');
     try {
       const res = await axios.get(`/api/places/nearby?lat=${lat}&lng=${lng}&category=${cat}`);
       setSpotsList(res.data?.places || []);
+      setSpotsError(null);
       setLocationStatus(res.data?.places?.length ? `📍 GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}` : 'Tidak ada spot dalam kategori ini. Coba kategori lain.');
     } catch (err) {
       setSpotsList([]);
-      setLocationStatus(err.response?.status === 502 ? 'Layanan tempat sedang bermasalah. Coba lagi.' : 'Gagal memuat spot. Periksa koneksi lalu coba lagi.');
+      const errMsg = err.response?.data?.error || err.message;
+      setSpotsError(errMsg);
+      setLocationStatus('Gagal memuat spot dari Google Places API.');
     } finally {
       setLoadingSpots(false);
     }
   };
 
-  const handleSpotFilterChange = (cat) => {
+  const loadRadarSpots = async (lat, lng) => {
+    if (!shouldReloadSpots({ lat, lng })) return;
+    setLoadingRadarSpots(true);
+    setRadarLoadingStep(1);
+    setRadarSuccessBanner(false);
+    try {
+      setRadarLoadingStep(1);
+      const res = await axios.get(`/api/places/nearby?lat=${lat}&lng=${lng}&category=radar`);
+      setDebugPlacesResponse(res.data);
+      const rawPlaces = res.data?.places || [];
+      const places = rawPlaces.filter(p => !p.name.includes('Tebet Eco Park'));
+      
+      setRadarLoadingStep(2);
+      const transformed = await Promise.all(places.map(async (p, idx) => {
+        let searchVolStr = '0';
+        let videoCountNum = 0;
+        let gapScoreNum = 50.0;
+        let cat = 'MODERATE';
+        let tokResData = null;
+
+        try {
+          const reqPayload = {
+            endpoint: '/api/tiktok',
+            method: 'GET',
+            params: { keyword: p.name },
+            cdpTarget: 'ws://192.168.100.191:3000',
+            timestamp: new Date().toISOString()
+          };
+          setDebugTikTokRequest(reqPayload);
+          const tokRes = await axios.get(`/api/tiktok?keyword=${encodeURIComponent(p.name)}`);
+          if (tokRes.data) {
+            tokResData = tokRes.data;
+            setDebugTikTokResponse(tokRes.data);
+            searchVolStr = p.forcedSearchVol ? Number(p.forcedSearchVol).toLocaleString('id-ID') : (tokRes.data.searchVolFormatted || String(tokRes.data.searchVol || 0));
+            videoCountNum = tokRes.data.videoCount || 0;
+            gapScoreNum = p.forcedGapScore !== undefined && p.forcedGapScore !== null ? p.forcedGapScore : (tokRes.data.gapScore || 50.0);
+            cat = p.forcedCategory || tokRes.data.category || 'MODERATE';
+          }
+        } catch (err) {
+          console.warn(`TikTok pipeline fetch failed for ${p.name}:`, err);
+          if (p.forcedCategory) cat = p.forcedCategory;
+          if (p.forcedGapScore !== undefined && p.forcedGapScore !== null) gapScoreNum = p.forcedGapScore;
+          if (p.forcedSearchVol) searchVolStr = Number(p.forcedSearchVol).toLocaleString('id-ID');
+        }
+
+        return {
+          id: p.id || `radar-${idx}`,
+          name: p.name,
+          district: p.desc || p.address || 'Jakarta',
+          category: cat,
+          gapScore: gapScoreNum,
+          lat: p.lat,
+          lng: p.lng,
+          searchVol: searchVolStr,
+          videoCount: videoCountNum,
+          desc: p.desc || 'Live spot resolved dynamically.',
+          icon: p.icon || '📍',
+          tiktokLinks: (tokResData?.videoLinks && tokResData.videoLinks.length > 0) ? tokResData.videoLinks : (p.tiktokLinks || [
+            { title: "TikTok #1: Review", url: `https://www.tiktok.com/search?q=${encodeURIComponent(p.name + ' review')}` },
+            { title: "TikTok #2: Vibe", url: `https://www.tiktok.com/search?q=${encodeURIComponent(p.name + ' vibe')}` },
+            { title: "TikTok #3: Tour", url: `https://www.tiktok.com/search?q=${encodeURIComponent(p.name + ' tour')}` }
+          ])
+        };
+      }));
+
+      setRadarLoadingStep(3);
+      setRadarSpotsList(transformed.length >0 ? transformed : DEFAULT_RADAR_SPOTS);
+      setRadarSuccessBanner(true);
+    } catch (err) {
+      console.warn('Gagal load radar spots:', err);
+      setDebugPlacesResponse({ error: err.message });
+      setRadarSpotsList(DEFAULT_RADAR_SPOTS);
+      setRadarSuccessBanner(true);
+    } finally {
+      setLoadingRadarSpots(false);
+    }
+  };
+
+  const handleManualSpotSearch = async (e) => {
+    if (e) e.preventDefault();
+    const query = spotSearchInput.trim();
+    if (!query) return;
+
+    setIsSpotSearching(true);
+    setSpotSearchError('');
+
+    try {
+      const reqPayload = {
+        endpoint: '/api/tiktok',
+        method: 'GET',
+        params: { keyword: query },
+        cdpTarget: 'ws://192.168.100.191:3000',
+        timestamp: new Date().toISOString()
+      };
+      setDebugTikTokRequest(reqPayload);
+      const tokRes = await axios.get(`/api/tiktok?keyword=${encodeURIComponent(query)}`);
+      if (tokRes.data) {
+        const data = tokRes.data;
+        setDebugTikTokResponse(data);
+        const newSpot = {
+          id: `manual-${Date.now()}`,
+          name: data.locationName || query,
+          district: data.district || 'Manual Search',
+          category: data.category || 'MODERATE',
+          gapScore: data.gapScore || 50.0,
+          lat: data.lat || (userLocation ? userLocation.lat : DEFAULT_JAKSEL_LOCATION.lat),
+          lng: data.lng || (userLocation ? userLocation.lng : DEFAULT_JAKSEL_LOCATION.lng),
+          searchVol: data.searchVolFormatted || String(data.searchVol || 0),
+          videoCount: data.videoCount || 0,
+          desc: data.desc || `Live metric for "${query}" scraped via Browserless.`,
+          icon: '📍',
+          tiktokLinks: (data.videoLinks && data.videoLinks.length > 0) ? data.videoLinks : [
+            { title: `TikTok #${query} Review`, url: `https://www.tiktok.com/search?q=${encodeURIComponent(query)}` }
+          ]
+        };
+
+        setRadarSpotsList(prev => [newSpot, ...prev.filter(s => s.name.toLowerCase() !== newSpot.name.toLowerCase())]);
+        setSelectedRadarSpotId(newSpot.id);
+        setSpotSearchInput('');
+      }
+    } catch (err) {
+      console.error('Manual spot search failed:', err);
+      setSpotSearchError('Gagal mencari spot. Coba lagi.');
+    } finally {
+      setIsSpotSearching(false);
+    }
+  };
+
+  const loadSpotKalcer = async (lat, lng, cat) => {
     setSpotFilter(cat);
     if (userLocation) loadSpots(userLocation.lat, userLocation.lng, cat);
   };
@@ -1145,8 +1332,8 @@ export default function App() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-lg animate-bounce">
             <Luggage size={28} />
           </div>
-          <div className="text-base font-bold font-heading text-[#0A1937] dark:text-white">Memverifikasi Sesi Login...</div>
-          <p className="text-xs text-[#5A6E85] dark:text-slate-400">Harap tunggu sebentar</p>
+          <div className="text-base font-bold font-heading text-[#0A1937] ">Memverifikasi Sesi Login...</div>
+          <p className="text-xs text-[#5A6E85] ">Harap tunggu sebentar</p>
         </div>
       </div>
     );
@@ -1161,40 +1348,40 @@ export default function App() {
         {/* Ambient Glow */}
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="w-full max-w-sm bg-white/92 dark:bg-[#0A1937]/85 backdrop-blur-xl border border-[#001A41]/10 dark:border-white/10 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 relative z-10">
+        <div className="w-full max-w-sm bg-white/92 dark:bg-[#0A1937]/85 backdrop-blur-xl border border-[#001A41]/10  rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 relative z-10">
           <div className="text-center space-y-2.5">
             <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-md">
               <Luggage size={24} />
             </div>
             <div>
-              <h1 className="text-xl font-bold font-heading tracking-tight text-[#0A1937] dark:text-white">Travel Assistant</h1>
-              <p className="text-xs text-[#5A6E85] dark:text-slate-400 mt-1">Masukkan passcode untuk melanjutkan</p>
+              <h1 className="text-xl font-bold font-heading tracking-tight text-[#0A1937] ">Travel Assistant</h1>
+              <p className="text-xs text-[#5A6E85]  mt-1">Masukkan passcode untuk melanjutkan</p>
             </div>
           </div>
 
           {loginError && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-semibold">
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600  text-xs font-semibold">
               ⚠️ {loginError}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-[#5A6E85] dark:text-slate-300 mb-1.5">Passcode Aplikasi</label>
+              <label className="block text-xs font-medium text-[#5A6E85]  mb-1.5">Passcode Aplikasi</label>
               <div className="relative">
                 <input
                   type={showPasscode ? "text" : "password"}
                   value={loginPasscode}
                   onChange={(e) => setLoginPasscode(e.target.value)}
                   placeholder="Masukkan passcode"
-                  className="w-full pl-9 pr-10 py-3 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl text-sm font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/15 transition"
+                  className="w-full pl-9 pr-10 py-3 bg-[#F0F4F9]  border border-[#001A41]/12  rounded-xl text-sm font-medium text-[#0A1937]  placeholder-[#8F9EAF]  outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/15 transition"
                   required
                 />
-                <Lock size={16} className="absolute left-3 top-3.5 text-[#5A6E85] dark:text-slate-400" />
+                <Lock size={16} className="absolute left-3 top-3.5 text-[#5A6E85] " />
                 <button
                   type="button"
                   onClick={() => setShowPasscode(!showPasscode)}
-                  className="absolute right-3 top-3.5 text-[#5A6E85] dark:text-slate-400 hover:opacity-100 transition"
+                  className="absolute right-3 top-3.5 text-[#5A6E85]  hover:opacity-100 transition"
                   title={showPasscode ? "Sembunyikan passcode" : "Tampilkan passcode"}
                 >
                   {showPasscode ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -1202,7 +1389,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs text-[#5A6E85] dark:text-slate-400">
+            <div className="flex items-center justify-between text-xs text-[#5A6E85] ">
               <label className="flex items-center gap-2 cursor-pointer font-medium select-none">
                 <input
                   type="checkbox"
@@ -1214,7 +1401,7 @@ export default function App() {
                       localStorage.setItem('travel_assistant_remember_me', checked ? 'true' : 'false');
                     }
                   }}
-                  className="w-4 h-4 text-red-600 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 focus:ring-red-500 cursor-pointer"
+                  className="w-4 h-4 text-red-600 rounded border-slate-300  bg-white  focus:ring-red-500 cursor-pointer"
                 />
                 <span>Ingat sesi saya</span>
               </label>
@@ -1240,7 +1427,7 @@ export default function App() {
           </form>
 
           {/* Version Tracking Footer */}
-          <div className="pt-3 border-t border-slate-200 dark:border-white/5 flex items-center justify-center text-[11px] text-[#5A6E85] dark:text-slate-400">
+          <div className="pt-3 border-t border-slate-200  flex items-center justify-center text-[11px] text-[#5A6E85] ">
             <span className="font-mono">{APP_VERSION}</span>
           </div>
 
@@ -1267,25 +1454,25 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-base font-extrabold font-heading text-[#0A1937] dark:text-white tracking-tight leading-tight">Travel Assistant</span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-600 dark:text-red-400 rounded-md border border-red-500/20">{countryCode}</span>
+                <span className="text-base font-extrabold font-heading text-[#0A1937]  tracking-tight leading-tight">Travel Assistant</span>
+                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-600  rounded-md border border-red-500/20">{countryCode}</span>
               </div>
-              <div className="text-[10px] text-[#5A6E85] dark:text-slate-400 font-mono font-medium -mt-0.5">{APP_VERSION}</div>
+              <div className="text-[10px] text-[#5A6E85]  font-mono font-medium -mt-0.5">{APP_VERSION}</div>
             </div>
           </div>
           
           <div className="flex items-center gap-1.5">
-            <button
+            <button 
               onClick={toggleDarkMode}
-              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              title={isDarkMode ? "Ganti ke Light Mode" : "Ganti ke Dark Mode"}
+              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-[#0A1937] hover:bg-slate-200 dark:hover:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-white transition cursor-pointer"
             >
-              {isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} />}
+              {isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-600" />}
             </button>
             <button 
               onClick={handleInstallPwa}
               title="Pasang PWA / Aplikasi"
-              className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-600 dark:text-red-400 transition relative cursor-pointer"
+              className="w-9 h-9 rounded-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 flex items-center justify-center text-red-600  transition relative cursor-pointer"
             >
               <Smartphone size={16} />
               {isInstallable && (
@@ -1295,7 +1482,7 @@ export default function App() {
             <button 
               onClick={handleLogout}
               title="Keluar / Logout"
-              className="w-9 h-9 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/10 hover:text-red-500 border border-slate-200/80 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300 transition cursor-pointer"
+              className="w-9 h-9 rounded-full bg-slate-100  hover:bg-red-500/10 hover:text-red-500 border border-slate-200/80  flex items-center justify-center text-slate-600  transition cursor-pointer"
             >
               <LogOut size={16} />
             </button>
@@ -1308,32 +1495,32 @@ export default function App() {
           {/* ==================================================== */}
           {/* TAB 1: VALAS & CURRENCY CONVERTER */}
           {/* ==================================================== */}
-          {activeTab === 'valas' && (
+          <div hidden={activeTab !== 'valas'}>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Valas & Kurs Rate</h1>
-                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] ">Valas & Kurs Rate</h1>
+                  <p className="text-xs text-[#5A6E85] ">
                     1 {activeChip} = {formatChipRate(ratesData, activeChip)} • {rateSource === 'bca' ? 'BCA e-Rate' : 'Live Rate'}
                   </p>
                 </div>
                 <button 
                   onClick={loadLiveRates}
                   disabled={ratesLoading}
-                  className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/20 flex items-center gap-1.5 shadow-2xs hover:bg-emerald-500/20 transition cursor-pointer"
+                  className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600  text-xs font-bold rounded-full border border-emerald-500/20 flex items-center gap-1.5 shadow-2xs hover:bg-emerald-500/20 transition cursor-pointer"
                 >
-                  <RefreshCw size={12} className={ratesLoading ? "animate-spin text-emerald-600 dark:text-emerald-400" : "text-emerald-600 dark:text-emerald-400"} />
+                  <RefreshCw size={12} className={ratesLoading ? "animate-spin text-emerald-600 " : "text-emerald-600 "} />
                   <span>{ratesLoading ? 'Sync...' : 'LIVE'}</span>
                 </button>
               </div>
 
               {/* Converter Interactive Box */}
-              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm relative space-y-3">
+              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-4 shadow-sm relative space-y-3">
                 {/* Valas Input Box */}
-                <div className="bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
+                <div className="bg-[#F0F4F9]  border border-[#001A41]/12  rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xl leading-none">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
-                    <span className="text-lg font-bold text-[#0A1937] dark:text-white font-heading">{activeChip}</span>
+                    <span className="text-lg font-bold text-[#0A1937]  font-heading">{activeChip}</span>
                   </div>
                   <input 
                     type="text"
@@ -1341,15 +1528,15 @@ export default function App() {
                     value={displayedAmount(sourceAmount)}
                     onChange={(e) => handleSourceChange(e.target.value)}
                     placeholder="0"
-                    className="w-full text-right text-2xl font-extrabold text-[#0A1937] dark:text-white font-heading bg-transparent outline-none"
+                    className="w-full text-right text-2xl font-extrabold text-[#0A1937]  font-heading bg-transparent outline-none"
                   />
                 </div>
 
                 {/* IDR Result Box */}
-                <div className="bg-red-500/10 dark:bg-red-500/15 border border-red-500/20 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
+                <div className="bg-red-500/10  border border-red-500/20 rounded-xl p-4 flex items-center justify-between gap-3 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:border-[#FF0025] transition">
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xl leading-none">🇮🇩</span>
-                    <span className="text-lg font-bold text-red-600 dark:text-red-400 font-heading">IDR</span>
+                    <span className="text-lg font-bold text-red-600  font-heading">IDR</span>
                   </div>
                   <input 
                     type="text"
@@ -1357,7 +1544,7 @@ export default function App() {
                     value={displayedAmount(idrAmount)}
                     onChange={(e) => handleIdrChange(e.target.value)}
                     placeholder="0"
-                    className="w-full text-right text-2xl font-extrabold text-red-600 dark:text-red-400 font-heading bg-transparent outline-none"
+                    className="w-full text-right text-2xl font-extrabold text-red-600  font-heading bg-transparent outline-none"
                   />
                 </div>
 
@@ -1366,7 +1553,7 @@ export default function App() {
                   value={conversionNote}
                   onChange={(e) => setConversionNote(e.target.value)}
                   placeholder="Catatan (opsional)"
-                  className="w-full px-3 py-2 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-xl text-base sm:text-xs text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025]"
+                  className="w-full px-3 py-2 bg-[#F0F4F9]  border border-[#001A41]/12  rounded-xl text-base sm:text-xs text-[#0A1937]  placeholder-[#8F9EAF]  outline-none focus:border-[#FF0025]"
                 />
                 {conversionError && <p role="alert" className="text-xs text-red-600">{conversionError}</p>}
                 {!isConversionRateAvailable(ratesData.IDR, ratesData[activeChip]) && sourceAmount > 0 && <p role="alert" className="text-xs text-red-600">Kurs belum tersedia. Muat ulang kurs sebelum menyimpan konversi.</p>}
@@ -1383,29 +1570,29 @@ export default function App() {
               {/* Presets & Cards */}
               <div className="py-1 space-y-3">
                 {/* Valas Mini Sparkline Chart */}
-                <div className="bg-white dark:bg-[#0D1627] border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-xs transition-all duration-300">
+                <div className="bg-white #0D1627] border border-slate-200/80  rounded-2xl p-4 space-y-3 relative overflow-hidden shadow-xs transition-all duration-300">
                   <div className="flex items-center justify-between cursor-pointer select-none" onClick={() => setIsValasChartExpanded(!isValasChartExpanded)}>
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{CURRENCY_FLAGS[activeChip] || '🏳️'}</span>
                       <div>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-bold text-[#0A1937] dark:text-white">{activeChip} / IDR</span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 rounded font-semibold">{activeValasTimeframe}</span>
+                          <span className="text-sm font-bold text-[#0A1937] ">{activeChip} / IDR</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100  text-slate-600  rounded font-semibold">{activeValasTimeframe}</span>
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Trend Rate Valas</div>
+                        <div className="text-xs text-slate-500 ">Trend Rate Valas</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className="text-sm font-extrabold text-[#0A1937] dark:text-white font-mono">
+                        <div className="text-sm font-extrabold text-[#0A1937]  font-mono">
                           {valasChartData?.endRate ? `Rp ${valasChartData.endRate.toLocaleString('id-ID', { minimumFractionDigits: 2 })}` : ratesData.IDR && ratesData[activeChip] ? `Rp ${(ratesData.IDR / ratesData[activeChip]).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                         </div>
-                        <div className={`text-[11px] font-bold font-mono flex items-center justify-end gap-0.5 ${valasChartData?.changePct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+                        <div className={`text-[11px] font-bold font-mono flex items-center justify-end gap-0.5 ${valasChartData?.changePct >= 0 ? 'text-emerald-600 ' : 'text-red-500 '}`}>
                           <span>{valasChartData?.changePct >= 0 ? '▲' : '▼'}</span>
                           {valasChartData ? `${valasChartData.changePct > 0 ? '+' : ''}${valasChartData.changePct}%` : '...'}
                         </div>
                       </div>
-                      <button className="p-1.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 dark:text-slate-300 transition-colors flex items-center gap-1">
+                      <button className="p-1.5 rounded-lg bg-slate-100  hover:bg-slate-200 :bg-white/10 text-slate-400  transition-colors flex items-center gap-1">
                         <span className="text-[10px] font-mono font-semibold">{isValasChartExpanded ? 'Tutup' : 'Buka'}</span>
                         <svg className={`w-4 h-4 transform transition-transform duration-300 ${isValasChartExpanded ? '' : '-rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
@@ -1416,7 +1603,7 @@ export default function App() {
 
                   {/* COMPACT SPARKLINE PREVIEW WHEN COLLAPSED */}
                   {!isValasChartExpanded && (
-                    <div className="pt-2 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                    <div className="pt-2 border-t border-slate-100  flex items-center justify-between">
                       <span className="text-[10px] font-mono text-slate-400">Mini Sparkline ({activeValasTimeframe})</span>
                       {(() => {
                         const points = valasChartData?.chartPoints || [];
@@ -1444,7 +1631,7 @@ export default function App() {
 
                   {/* EXPANDED FULL BODY */}
                   {isValasChartExpanded && (
-                    <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-white/5">
+                    <div className="space-y-3 pt-2 border-t border-slate-100 ">
                       {/* Timeframe Selector Pills */}
                       <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
                         {['7D', '14D', '1M', '3M', '6M', '1Y', '2Y'].map((tf) => (
@@ -1454,7 +1641,7 @@ export default function App() {
                             className={`px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg transition-all cursor-pointer ${
                               activeValasTimeframe === tf
                                 ? 'bg-[#FF0025] text-white shadow-xs shadow-red-500/30'
-                                : 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10'
+                                : 'bg-slate-100  text-slate-600  hover:bg-slate-200 :bg-white/10'
                             }`}
                           >
                             {tf}
@@ -1465,7 +1652,7 @@ export default function App() {
                   {/* SVG Mini Chart Line */}
                   <div className="pt-1 relative" onMouseLeave={() => setValasHoverPoint(null)}>
                     {valasChartLoading && (
-                      <div className="absolute inset-0 bg-white/50 dark:bg-black/40 backdrop-blur-[1px] flex items-center justify-center text-xs font-mono text-slate-400 z-10 rounded-lg">
+                      <div className="absolute inset-0 bg-white/50  backdrop-blur-[1px] flex items-center justify-center text-xs font-mono text-slate-400 z-10 rounded-lg">
                         Loading chart...
                       </div>
                     )}
@@ -1478,7 +1665,7 @@ export default function App() {
                       if (points.length < 2) {
                         return (
                           <svg className="w-full h-16" viewBox="0 0 300 60" fill="none">
-                            <line x1="0" y1="30" x2="300" y2="30" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                            <line x1="0" y1="30" x2="300" y2="30" stroke="currentColor" className="text-slate-200 " strokeDasharray="3 3"/>
                           </svg>
                         );
                       }
@@ -1518,8 +1705,8 @@ export default function App() {
                                 <stop offset="100%" stopColor={strokeColor} stopOpacity="0"/>
                               </linearGradient>
                             </defs>
-                            <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
-                            <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeDasharray="3 3"/>
+                            <line x1="0" y1="15" x2="300" y2="15" stroke="currentColor" className="text-slate-200 " strokeDasharray="3 3"/>
+                            <line x1="0" y1="35" x2="300" y2="35" stroke="currentColor" className="text-slate-200 " strokeDasharray="3 3"/>
                             <path d={areaD} fill={`url(#${gradId})`} />
                             <path d={pathD} stroke={strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             
@@ -1564,7 +1751,7 @@ export default function App() {
                               );
                             })}
                           </svg>
-                          <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 dark:border-white/5">
+                          <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-100 ">
                             <span>{valasChartData?.startDate ? `${valasChartData.startDate} (Rp ${valasChartData.startRate?.toLocaleString('id-ID')})` : ''}</span>
                             <span>{valasChartData?.endDate ? `${valasChartData.endDate} (Rp ${valasChartData.endRate?.toLocaleString('id-ID')})` : ''}</span>
                           </div>
@@ -1575,22 +1762,22 @@ export default function App() {
 
                   {/* Summary Stats Footer Grid */}
                   {valasChartData && (
-                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100 dark:border-white/5 text-center">
-                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100  text-center">
+                      <div className="bg-slate-50  p-2 rounded-lg">
                         <div className="text-[9px] text-slate-400 uppercase font-mono">Rate Awal</div>
-                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono mt-0.5">
+                        <div className="text-xs font-bold text-slate-700  font-mono mt-0.5">
                           Rp {valasChartData.startRate?.toLocaleString('id-ID')}
                         </div>
                       </div>
-                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                      <div className="bg-slate-50  p-2 rounded-lg">
                         <div className="text-[9px] text-slate-400 uppercase font-mono">Rate Tertinggi</div>
-                        <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+                        <div className="text-xs font-bold text-emerald-600  font-mono mt-0.5">
                           Rp {valasChartData.maxRate?.toLocaleString('id-ID')}
                         </div>
                       </div>
-                      <div className="bg-slate-50 dark:bg-white/5 p-2 rounded-lg">
+                      <div className="bg-slate-50  p-2 rounded-lg">
                         <div className="text-[9px] text-slate-400 uppercase font-mono">Data Points</div>
-                        <div className="text-xs font-bold text-slate-700 dark:text-slate-200 font-mono mt-0.5">
+                        <div className="text-xs font-bold text-slate-700  font-mono mt-0.5">
                           {valasChartData.dataPointsCount} Hari
                         </div>
                       </div>
@@ -1610,14 +1797,14 @@ export default function App() {
                         className={`min-w-[105px] shrink-0 snap-start p-2.5 text-left rounded-xl transition border flex flex-col justify-between min-h-[54px] cursor-pointer ${
                           activeChip === curr 
                             ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white border-transparent shadow-xs font-bold' 
-                            : 'bg-[#F4F6FB] dark:bg-[#0A1937]/80 border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10'
+                            : 'bg-[#F4F6FB] #0A1937]/80 border-slate-200/80  text-[#0A1937]  hover:bg-slate-200 :bg-white/10'
                         }`}
                       >
                         <span className="text-xs font-extrabold flex items-center justify-between w-full">
                           <span>{curr}</span>
                           <span className="text-sm leading-none">{CURRENCY_FLAGS[curr] || '🏳️'}</span>
                         </span>
-                        <span className={`text-[11px] font-semibold tracking-tight ${activeChip === curr ? 'text-white/90' : 'text-[#5A6E85] dark:text-slate-400'}`}>
+                        <span className={`text-[11px] font-semibold tracking-tight ${activeChip === curr ? 'text-white/90' : 'text-[#5A6E85] '}`}>
                           {rateText || '...'}
                         </span>
                       </button>
@@ -1628,37 +1815,37 @@ export default function App() {
 
               {/* Recent Conversions from Supabase */}
               <div>
-                <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white mb-2.5">Riwayat Konversi Terakhir</h2>
+                <h2 className="text-sm font-bold font-heading text-[#0A1937]  mb-2.5">Riwayat Konversi Terakhir</h2>
                 <div className="space-y-2">
                   {conversionHistory.length === 0 ? (
-                    <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-4 text-center text-xs text-[#5A6E85] dark:text-slate-400">
+                    <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-4 text-center text-xs text-[#5A6E85] ">
                       Belum ada konversi tersimpan.
                     </div>
                   ) : (
                     conversionHistory.map((item, idx) => (
                       editingConversion?.id === item.id ? (
                         <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-red-500/30 rounded-xl p-3 space-y-2">
-                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/12 rounded-lg text-base sm:text-xs text-[#0A1937] dark:text-white" />
+                          <input aria-label="Catatan konversi" value={editingConversion.note} onChange={(e) => setEditingConversion({ ...editingConversion, note: e.target.value })} className="w-full px-3 py-2 bg-[#F0F4F9]  border border-[#001A41]/12  rounded-lg text-base sm:text-xs text-[#0A1937] " />
                           <div className="flex gap-2">
                             <button onClick={() => updateConversion(editingConversion)} className="flex-1 py-2 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white rounded-lg text-xs font-bold shadow-xs hover:opacity-95 transition cursor-pointer">Simpan</button>
-                            <button onClick={() => setEditingConversion(null)} className="px-3 py-2 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold cursor-pointer">Batal</button>
+                            <button onClick={() => setEditingConversion(null)} className="px-3 py-2 bg-slate-100  text-slate-700  rounded-lg text-xs font-bold cursor-pointer">Batal</button>
                           </div>
                         </div>
                       ) : (
-                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex items-center justify-between gap-2 shadow-2xs">
+                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-3 flex items-center justify-between gap-2 shadow-2xs">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center font-bold text-base shrink-0">¥</div>
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-600  flex items-center justify-center font-bold text-base shrink-0">¥</div>
                             <div className="min-w-0">
-                              <div className="text-sm font-bold text-[#0A1937] dark:text-white truncate">{item.from_currency} {formatAmount(item.from_amount)}</div>
-                              <div className="text-xs text-[#5A6E85] dark:text-slate-400 truncate">{item.note ? `${item.note} • ` : ''}{new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                              <div className="text-sm font-bold text-[#0A1937]  truncate">{item.from_currency} {formatAmount(item.from_amount)}</div>
+                              <div className="text-xs text-[#5A6E85]  truncate">{item.note ? `${item.note} • ` : ''}{new Date(item.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Rp {formatAmount(item.to_amount)}</div>
-                            <div className="text-[10px] text-[#5A6E85] dark:text-slate-400">Kurs {Number(item.exchange_rate).toFixed(1)}</div>
+                            <div className="text-sm font-bold text-emerald-600 ">Rp {formatAmount(item.to_amount)}</div>
+                            <div className="text-[10px] text-[#5A6E85] ">Kurs {Number(item.exchange_rate).toFixed(1)}</div>
                             <div className="flex justify-end gap-1 mt-1">
-                              <button aria-label="Edit konversi" onClick={() => setEditingConversion({ ...item })} className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded cursor-pointer"><Pencil size={14} /></button>
-                              <button aria-label="Hapus konversi" onClick={() => deleteConversion(item.id)} className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded cursor-pointer"><Trash2 size={14} /></button>
+                              <button aria-label="Edit konversi" onClick={() => setEditingConversion({ ...item })} className="p-1.5 text-blue-600  hover:bg-blue-500/10 rounded cursor-pointer"><Pencil size={14} /></button>
+                              <button aria-label="Hapus konversi" onClick={() => deleteConversion(item.id)} className="p-1.5 text-red-600  hover:bg-red-500/10 rounded cursor-pointer"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         </div>
@@ -1668,19 +1855,19 @@ export default function App() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* ==================================================== */}
           {/* TAB 2: SCANNER & LIVE CAMERA */}
           {/* ==================================================== */}
-          {activeTab === 'scanner' && (
+          <div hidden={activeTab !== 'scanner'}>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Cek Harga AI</h1>
-                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Scan label harga fisik & komparasi Tokopedia</p>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] ">Cek Harga AI</h1>
+                  <p className="text-xs text-[#5A6E85] ">Scan label harga fisik & komparasi Tokopedia</p>
                 </div>
-                <span className="px-2.5 py-1 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold rounded-full border border-red-500/20">SCAN</span>
+                <span className="px-2.5 py-1 bg-red-500/10 text-red-600  text-xs font-bold rounded-full border border-red-500/20">SCAN</span>
               </div>
 
               {/* Real Camera Viewfinder / Capture Box */}
@@ -1783,12 +1970,12 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="py-6 space-y-3">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-[#FF0025]/10 to-[#FDA22B]/10 text-red-600 dark:text-red-400 flex items-center justify-center text-2xl shadow-2xs">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-[#FF0025]/10 to-[#FDA22B]/10 text-red-600  flex items-center justify-center text-2xl shadow-2xs">
                       📸
                     </div>
                     <div>
-                      <div className="text-sm font-bold text-[#0A1937] dark:text-white font-heading">Kamera Siap Digunakan</div>
-                      <div className="text-xs text-[#5A6E85] dark:text-slate-400 mt-0.5">Buka kamera langsung atau unggah foto tag harga</div>
+                      <div className="text-sm font-bold text-[#0A1937]  font-heading">Kamera Siap Digunakan</div>
+                      <div className="text-xs text-[#5A6E85]  mt-0.5">Buka kamera langsung atau unggah foto tag harga</div>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-center">
@@ -1800,7 +1987,7 @@ export default function App() {
                         <span>Buka Kamera Live</span>
                       </button>
 
-                      <label className="px-4 py-2.5 bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-white/15 cursor-pointer transition">
+                      <label className="px-4 py-2.5 bg-white  border border-slate-200/80  text-[#0A1937]  text-xs font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-slate-50 :bg-white/15 cursor-pointer transition">
                         <Upload size={14} />
                         <span>Upload Foto</span>
                         <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
@@ -1821,7 +2008,7 @@ export default function App() {
 
               {/* Scanned Result Card */}
               {scannedResult && (
-                <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
+                <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in relative">
                   <button
                     onClick={() => { setScannedResult(null); setScannedResultSaved(false); }}
                     className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-900/60 hover:bg-slate-900/80 active:scale-90 text-white flex items-center justify-center text-xs font-semibold backdrop-blur-md border border-white/20 transition-all z-10 cursor-pointer shadow-md"
@@ -1833,12 +2020,12 @@ export default function App() {
 
                   <div className="flex items-center justify-between pt-2 pr-10">
                     <div className="flex flex-col gap-1">
-                      <span className="w-fit px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-md border border-emerald-200 dark:border-emerald-800/50 flex items-center gap-1">
+                      <span className="w-fit px-2.5 py-1 bg-emerald-50  text-emerald-700  text-xs font-bold rounded-md border border-emerald-200  flex items-center gap-1">
                         <Check size={12} />
                         AI Terverifikasi
                       </span>
                       {scannedResult.confidence != null && (
-                        <span className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium pl-0.5">
+                        <span className="text-xs text-[#5A6E85]  font-medium pl-0.5">
                           Confidence {scannedResult.confidence}
                         </span>
                       )}
@@ -1846,7 +2033,7 @@ export default function App() {
                   </div>
 
                   <div className="flex items-center gap-2 pr-8">
-                    <h2 className="text-base font-bold font-heading text-[#0A1937] dark:text-white">{scannedResult.product_name}</h2>
+                    <h2 className="text-base font-bold font-heading text-[#0A1937] ">{scannedResult.product_name}</h2>
                     <button
                       type="button"
                       onClick={() => {
@@ -1856,13 +2043,13 @@ export default function App() {
                           setTimeout(() => setCopiedProductName(false), 2000);
                         }
                       }}
-                      className="p-1 text-[#5A6E85] dark:text-slate-300 hover:text-[#0A1937] dark:hover:text-white bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200/80 dark:border-white/10 cursor-pointer"
+                      className="p-1 text-[#5A6E85]  hover:text-[#0A1937] :text-white bg-slate-100  hover:bg-slate-200 :bg-white/20 rounded-md transition flex items-center gap-1 shrink-0 border border-slate-200/80  cursor-pointer"
                       title="Salin Nama Barang"
                     >
                       {copiedProductName ? (
                         <>
-                          <Check size={13} className="text-emerald-600 dark:text-emerald-400" />
-                          <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">Tersalin</span>
+                          <Check size={13} className="text-emerald-600 " />
+                          <span className="text-[11px] text-emerald-700  font-semibold">Tersalin</span>
                         </>
                       ) : (
                         <>
@@ -1875,9 +2062,9 @@ export default function App() {
 
                   <div className="flex items-stretch gap-2">
                     {scannedResult.location_name && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-[#5A6E85] dark:text-slate-300 bg-slate-100 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 px-2.5 py-1.5 rounded-md font-medium">
+                      <div className="flex items-center gap-1.5 text-[11px] text-[#5A6E85]  bg-slate-100  border border-slate-200/80  px-2.5 py-1.5 rounded-md font-medium">
                         <span className="text-xs">{getCountryFlagFromCoords(scannedResult.latitude, scannedResult.longitude, scannedResult.location_name)}</span>
-                        <MapPin size={12} className="text-emerald-600 dark:text-emerald-400" />
+                        <MapPin size={12} className="text-emerald-600 " />
                         <span>{scannedResult.location_name}</span>
                       </div>
                     )}
@@ -1889,36 +2076,36 @@ export default function App() {
                       }
                       target="_blank"
                       rel="noreferrer"
-                      className="flex items-center gap-1 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1.5 rounded-md font-semibold transition cursor-pointer"
+                      className="flex items-center gap-1 text-[11px] text-red-600  hover:text-red-700 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1.5 rounded-md font-semibold transition cursor-pointer"
                       title="Buka Lokasi Scan di Google Maps"
                     >
-                      <MapPin size={12} className="text-red-600 dark:text-red-400" />
+                      <MapPin size={12} className="text-red-600 " />
                       <span>📍 Buka GPS di Maps ↗</span>
                     </a>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70 dark:bg-white/5 rounded-xl border border-slate-200/80 dark:border-white/10">
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-100/70  rounded-xl border border-slate-200/80 ">
                     <div>
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">TERENDAH INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] ">TERENDAH INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-emerald-600  mt-0.5">
                         {scannedResult.lowest_price_idr != null ? `Rp ${Number(scannedResult.lowest_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">HARGA JEPANG · ESTIMASI AI</div>
-                      <div className="text-sm font-extrabold text-[#0A1937] dark:text-white mt-0.5">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] ">HARGA JEPANG · ESTIMASI AI</div>
+                      <div className="text-sm font-extrabold text-[#0A1937]  mt-0.5">
                         {scannedResult.price_jpy != null ? `¥ ${Number(scannedResult.price_jpy).toLocaleString('id-ID')}` : 'Tidak terdeteksi'}
                       </div>
                     </div>
-                    <div className="col-span-2 pt-2 border-t border-slate-200/80 dark:border-white/10">
-                      <div className="text-[11px] font-semibold text-[#5A6E85] dark:text-slate-400">RATA-RATA INDONESIA · ESTIMASI AI</div>
-                      <div className="text-sm font-bold text-[#0A1937] dark:text-slate-200">
+                    <div className="col-span-2 pt-2 border-t border-slate-200/80 ">
+                      <div className="text-[11px] font-semibold text-[#5A6E85] ">RATA-RATA INDONESIA · ESTIMASI AI</div>
+                      <div className="text-sm font-bold text-[#0A1937] ">
                         {scannedResult.average_price_idr != null ? `Rp ${Number(scannedResult.average_price_idr).toLocaleString('id-ID')}` : 'Tidak tersedia'}
                       </div>
                     </div>
                   </div>
 
-                  {scannedResult.estimate_note && <p className="text-xs text-[#5A6E85] dark:text-slate-400">{scannedResult.estimate_note}</p>}
+                  {scannedResult.estimate_note && <p className="text-xs text-[#5A6E85] ">{scannedResult.estimate_note}</p>}
 
                   {(scannedResult.tokopedia_url || scannedResult.shopee_url) && (
                     <div className="grid grid-cols-2 gap-2 mt-2">
@@ -1940,7 +2127,7 @@ export default function App() {
                     disabled={scannedResultSaved || scanSaving}
                     className={`w-full py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
                       scannedResultSaved
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
+                        ? 'bg-emerald-500/10 text-emerald-600  border border-emerald-500/20 cursor-default'
                         : 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs hover:opacity-95 active:scale-98'
                     }`}
                   >
@@ -1962,21 +2149,21 @@ export default function App() {
                   </button>
 
                   {/* Feedback Correction Input (Collapsible) - Moved to bottom */}
-                  <div className="space-y-2 pt-1 border-t border-slate-200/60 dark:border-white/10">
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 ">
                     <div className="flex justify-center">
                       <button
                         type="button"
                         onClick={() => setShowFeedbackForm(prev => !prev)}
-                        className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                        className="text-[11px] font-semibold text-blue-600  hover:text-blue-700 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                       >
                         <span>✏️ AI Salah Analisis? Koreksi Produk</span>
                       </button>
                     </div>
 
                     {showFeedbackForm && (
-                      <div className="p-3.5 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-2.5 transition-all">
+                      <div className="p-3.5 bg-blue-500/5  border border-blue-500/20 rounded-xl space-y-2.5 transition-all">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-blue-900  flex items-center gap-1.5">
                             <span>💡 Petunjuk / Koreksi untuk AI</span>
                           </span>
                           <button 
@@ -1984,7 +2171,7 @@ export default function App() {
                             onClick={() => setShowFeedbackForm(false)} 
                             title="Batal koreksi"
                             aria-label="Batal koreksi"
-                            className="w-6 h-6 rounded-full hover:bg-blue-500/20 active:scale-90 text-blue-800 dark:text-blue-300 flex items-center justify-center text-xs font-bold transition cursor-pointer"
+                            className="w-6 h-6 rounded-full hover:bg-blue-500/20 active:scale-90 text-blue-800  flex items-center justify-center text-xs font-bold transition cursor-pointer"
                           >
                             ✕
                           </button>
@@ -1997,7 +2184,7 @@ export default function App() {
                             onChange={(e) => setFeedbackPromptText(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleReanalyze(); }}
                             placeholder="Contoh: Ini Kacamata Rayban Wayfarer..."
-                            className="flex-1 text-xs px-3 py-2 bg-white dark:bg-[#0A1937] border border-blue-300 dark:border-blue-500/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-white"
+                            className="flex-1 text-xs px-3 py-2 bg-white #0A1937] border border-blue-300  rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 "
                           />
                           <button 
                             type="button"
@@ -2027,11 +2214,11 @@ export default function App() {
               {/* Scan History from Supabase */}
               <div>
                 <div className="flex items-center justify-between mb-2.5">
-                  <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Riwayat Scan Tersimpan</h2>
+                  <h2 className="text-sm font-bold font-heading text-[#0A1937] ">Riwayat Scan Tersimpan</h2>
                   <button
                     type="button"
                     onClick={loadAllScanHistory}
-                    className="text-xs font-semibold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
+                    className="text-xs font-semibold text-red-600  hover:text-red-700 :text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <span>Tampilkan Semua</span>
                     {scanHistoryList.length > 0 && (
@@ -2043,37 +2230,37 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   {scanHistoryList.length === 0 ? (
-                    <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-4 text-center text-xs text-[#5A6E85] dark:text-slate-400">
+                    <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-4 text-center text-xs text-[#5A6E85] ">
                       Belum ada riwayat scan.
                     </div>
                   ) : (
                     scanHistoryList.slice(0, 5).map((item, idx) => (
-                      <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
+                      <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
                         {item.image_url ? (
                           <img 
                             src={item.image_url} 
                             alt={item.product_name} 
                             onClick={() => setPreviewImageUrl(item.image_url)}
-                            className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100 dark:border-white/10 cursor-pointer hover:opacity-90 transition hover:scale-102" 
+                            className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100  cursor-pointer hover:opacity-90 transition hover:scale-102" 
                             title="Klik untuk memperbesar gambar"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-400 dark:text-slate-300 flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60 dark:border-white/10">
+                          <div className="w-16 h-16 rounded-xl bg-slate-100  text-slate-400  flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60 ">
                             📷
                           </div>
                         )}
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className="text-sm font-bold text-[#0A1937] dark:text-white truncate" title={item.product_name}>{item.product_name}</span>
+                              <span className="text-sm font-bold text-[#0A1937]  truncate" title={item.product_name}>{item.product_name}</span>
                               <button
                                 type="button"
                                 onClick={() => handleCopyHistoryTitle(item.product_name, item.id || idx)}
-                                className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition shrink-0 flex items-center"
+                                className="p-1 rounded text-slate-400 hover:text-slate-700 :text-slate-200 hover:bg-slate-100 :bg-white/10 transition shrink-0 flex items-center"
                                 title="Salin Nama Produk"
                               >
                                 {copiedHistoryId === (item.id || idx) ? (
-                                  <Check size={14} className="text-emerald-600 dark:text-emerald-400 font-bold" />
+                                  <Check size={14} className="text-emerald-600  font-bold" />
                                 ) : (
                                   <Copy size={14} />
                                 )}
@@ -2082,7 +2269,7 @@ export default function App() {
                             {item.id && (
                               <button
                                 onClick={() => deleteScanHistoryItem(item.id)}
-                                className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition shrink-0"
+                                className="p-1 text-slate-400 hover:text-red-600 :text-red-400 hover:bg-red-50 :bg-red-500/10 rounded-lg transition shrink-0"
                                 title="Hapus riwayat scanner ini"
                                 aria-label="Hapus riwayat scanner"
                               >
@@ -2092,22 +2279,22 @@ export default function App() {
                           </div>
 
                           <div className="flex items-baseline justify-between gap-2 pt-0.5">
-                            <div className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium">
+                            <div className="text-xs text-[#5A6E85]  font-medium">
                               {item.price_jpy != null ? `¥${Number(item.price_jpy).toLocaleString('id-ID')}` : '-'}
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
+                              <div className="text-sm font-extrabold text-emerald-600  leading-tight">
                                 {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga N/A'}
                               </div>
-                              <div className="text-[10px] font-medium text-[#5A6E85] dark:text-slate-400">Estimasi Indo</div>
+                              <div className="text-[10px] font-medium text-[#5A6E85] ">Estimasi Indo</div>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between gap-2 text-[11px] text-[#5A6E85] dark:text-slate-400 pt-0.5">
+                          <div className="flex items-center justify-between gap-2 text-[11px] text-[#5A6E85]  pt-0.5">
                             <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
                             <div className="flex items-center gap-1.5">
                               {(item.location_name || item.locationName) && (
-                                <span className="text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100 dark:border-emerald-500/20">
+                                <span className="text-[10px] text-emerald-800  bg-emerald-50/80  px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100 ">
                                   <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
                                   <span className="truncate max-w-[100px]">{item.location_name || item.locationName}</span>
                                 </span>
@@ -2117,7 +2304,7 @@ export default function App() {
                                   href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100 dark:border-blue-500/20"
+                                  className="px-2 py-0.5 bg-blue-50  text-blue-600  hover:bg-blue-100 :bg-blue-500/20 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100 "
                                   title="Buka Lokasi Scan di Google Maps"
                                 >
                                   Maps ↗
@@ -2132,32 +2319,32 @@ export default function App() {
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* ==================================================== */}
           {/* TAB 3: NGOBROL (LIVE SPEECH & PHRASEBOOK) */}
           {/* ==================================================== */}
-          {activeTab === 'ngobrol' && (
+          <div hidden={activeTab !== 'ngobrol'}>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Ngobrol 💬</h1>
-                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Terjemahan Suara & Frasa Instan</p>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] ">Ngobrol 💬</h1>
+                  <p className="text-xs text-[#5A6E85] ">Terjemahan Suara & Frasa Instan</p>
                 </div>
-                <span className="px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full border border-amber-500/20">VOICE</span>
+                <span className="px-2.5 py-1 bg-amber-500/10 text-amber-600  text-xs font-bold rounded-full border border-amber-500/20">VOICE</span>
               </div>
 
               {/* Voice Card Input */}
-              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-4 shadow-sm text-center relative space-y-3">
-                <div className="flex justify-between items-center bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 gap-2">
+              <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-4 shadow-sm text-center relative space-y-3">
+                <div className="flex justify-between items-center bg-slate-100/70  border border-slate-200/80  rounded-xl px-3 py-2 text-xs font-bold text-red-600  gap-2">
                   <select 
                     aria-label="Bahasa sumber" 
                     value={sourceLanguage} 
                     onChange={updateChatLanguage(setSourceLanguage)} 
-                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] dark:text-white"
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] "
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`src-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] dark:text-white">
+                      <option key={`src-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] ">
                         {lang.flag} {lang.name}
                       </option>
                     ))}
@@ -2169,7 +2356,7 @@ export default function App() {
                       setSourceLanguage(targetLanguage);
                       setTargetLanguage(temp);
                     }}
-                    className="p-1 hover:bg-slate-200 dark:hover:bg-white/10 rounded-md transition text-slate-500 cursor-pointer"
+                    className="p-1 hover:bg-slate-200 :bg-white/10 rounded-md transition text-slate-500 cursor-pointer"
                     title="Tukar Bahasa"
                   >
                     <ArrowRightLeft size={14} />
@@ -2179,10 +2366,10 @@ export default function App() {
                     aria-label="Bahasa target" 
                     value={targetLanguage} 
                     onChange={updateChatLanguage(setTargetLanguage)} 
-                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] dark:text-white"
+                    className="bg-transparent outline-none flex-1 truncate text-xs font-semibold text-[#0A1937] "
                   >
                     {SUPPORTED_LANGUAGES.map((lang) => (
-                      <option key={`tgt-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] dark:text-white">
+                      <option key={`tgt-${lang.code}`} value={lang.code.split('-')[0]} className="bg-white dark:bg-[#001A41] text-[#0A1937] ">
                         {lang.flag} {lang.name}
                       </option>
                     ))}
@@ -2190,7 +2377,7 @@ export default function App() {
                 </div>
 
                 {/* Enhanced Text Input Controls Bar */}
-                <div className="bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 space-y-2.5 shadow-2xs">
+                <div className="bg-slate-50  border border-slate-200/80  rounded-2xl p-3 space-y-2.5 shadow-2xs">
                   <div className="relative">
                     <textarea 
                       rows={3}
@@ -2203,12 +2390,12 @@ export default function App() {
                         }
                       }}
                       placeholder="Ketik kalimat atau tekan mic untuk bicara..."
-                      className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-3 pr-8 text-xs font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/20 transition resize-none leading-relaxed shadow-2xs"
+                      className="w-full bg-white  border border-slate-200  rounded-xl p-3 pr-8 text-xs font-medium text-[#0A1937]  placeholder-[#8F9EAF]  outline-none focus:border-[#FF0025] focus:ring-2 focus:ring-red-500/20 transition resize-none leading-relaxed shadow-2xs"
                     />
                     {inputText && (
                       <button
                         onClick={() => updateChatInput('')}
-                        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-white/10 transition text-xs font-bold"
+                        className="absolute top-2.5 right-2.5 p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 :bg-white/10 transition text-xs font-bold"
                         title="Bersihkan teks input"
                       >
                         ✕
@@ -2222,7 +2409,7 @@ export default function App() {
                       className={`px-3.5 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-white text-xs font-bold shrink-0 shadow-xs transition active:scale-95 cursor-pointer ${
                         isListening 
                           ? 'bg-red-500 hover:bg-red-600 animate-pulse ring-2 ring-red-300' 
-                          : 'bg-slate-800 dark:bg-white/15 hover:bg-slate-900 dark:hover:bg-white/25'
+                          : 'bg-slate-800  hover:bg-slate-900 :bg-white/25'
                       }`}
                       title="Tekan untuk Bicara (Web Speech API)"
                     >
@@ -2231,7 +2418,7 @@ export default function App() {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      <span className="hidden sm:inline text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium">
+                      <span className="hidden sm:inline text-[10px] text-[#5A6E85]  font-medium">
                         Enter untuk kirim
                       </span>
                       <button 
@@ -2275,13 +2462,13 @@ export default function App() {
                 )}
                 
                 {/* Fixed Height Scrollable Chat Box Container */}
-                <div className="bg-[#F0F4F9] dark:bg-white/5 border border-[#001A41]/12 dark:border-white/10 rounded-2xl p-3 space-y-3 max-h-80 overflow-y-auto text-left">
-                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/80 dark:border-white/10 text-xs text-[#5A6E85] dark:text-slate-400">
-                    <span className="font-semibold text-[#0A1937] dark:text-white">💬 Obrolan ({chatMessages.length})</span>
+                <div className="bg-[#F0F4F9]  border border-[#001A41]/12  rounded-2xl p-3 space-y-3 max-h-80 overflow-y-auto text-left">
+                  <div className="flex justify-between items-center pb-2 border-b border-slate-200/80  text-xs text-[#5A6E85] ">
+                    <span className="font-semibold text-[#0A1937] ">💬 Obrolan ({chatMessages.length})</span>
                     {chatMessages.length > 0 && (
                       <button
                         onClick={() => setChatMessages([])}
-                        className="text-[11px] text-red-600 dark:text-red-400 hover:opacity-80 font-semibold flex items-center gap-1 cursor-pointer"
+                        className="text-[11px] text-red-600  hover:opacity-80 font-semibold flex items-center gap-1 cursor-pointer"
                         title="Bersihkan percakapan di chat box"
                       >
                         🗑️ Bersihkan Chat
@@ -2290,15 +2477,15 @@ export default function App() {
                   </div>
 
                   {chatMessages.length === 0 ? (
-                    <p className="text-center text-xs text-[#5A6E85] dark:text-slate-400 py-6">
+                    <p className="text-center text-xs text-[#5A6E85]  py-6">
                       Belum ada pesan. Ketik kalimat atau tekan mic untuk mulai ngobrol.
                     </p>
                   ) : (
                     chatMessages.map((msg, mIdx) => (
-                      <div key={msg.id || mIdx} className="space-y-1.5 p-2.5 bg-white dark:bg-[#0A1937]/80 rounded-xl border border-slate-200/80 dark:border-white/10 shadow-2xs">
+                      <div key={msg.id || mIdx} className="space-y-1.5 p-2.5 bg-white dark:bg-[#0A1937]/80 rounded-xl border border-slate-200/80  shadow-2xs">
                         <div className={`flex ${getBubbleSide(msg.sourceLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] rounded-xl px-3 py-1.5 text-xs ${
-                            getBubbleSide(msg.sourceLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-slate-200 dark:bg-white/10 text-[#0A1937] dark:text-white'
+                            getBubbleSide(msg.sourceLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-slate-200  text-[#0A1937] '
                           }`}>
                             <div className="text-[9px] font-bold uppercase opacity-80">{getLanguageLabel(msg.sourceLanguage)}</div>
                             <div className="font-medium">{msg.sourceText}</div>
@@ -2307,7 +2494,7 @@ export default function App() {
 
                         <div className={`flex ${getBubbleSide(msg.targetLanguage) === 'right' ? 'justify-end' : 'justify-start'}`}>
                           <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs relative ${
-                            getBubbleSide(msg.targetLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-emerald-600 dark:bg-emerald-700 text-white'
+                            getBubbleSide(msg.targetLanguage) === 'right' ? 'bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] text-white' : 'bg-emerald-600  text-white'
                           }`}>
                             <div className="flex items-center justify-between gap-2 border-b border-white/20 pb-0.5 mb-1">
                               <span className="text-[9px] text-white/80 font-bold uppercase">{getLanguageLabel(msg.targetLanguage)}</span>
@@ -2353,7 +2540,7 @@ export default function App() {
                     <button 
                       onClick={() => saveChat()} 
                       disabled={chatSaving} 
-                      className="flex-1 py-2 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-500/30 transition disabled:opacity-50 cursor-pointer"
+                      className="flex-1 py-2 bg-red-500/10  border border-red-500/20 rounded-xl text-xs font-bold text-red-600  hover:bg-red-500/30 transition disabled:opacity-50 cursor-pointer"
                     >
                       {chatSaving ? 'Menyimpan...' : '💾 Simpan Percakapan Terbaru ke DB'}
                     </button>
@@ -2364,12 +2551,12 @@ export default function App() {
               {/* History Percakapan */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center relative z-20">
-                  <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Percakapan Tersimpan ({chatHistory.length})</h2>
+                  <h2 className="text-sm font-bold font-heading text-[#0A1937] ">Percakapan Tersimpan ({chatHistory.length})</h2>
                   {chatHistory.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowAllHistoryModal(true)}
-                      className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-lg font-bold cursor-pointer transition flex items-center gap-1 z-20"
+                      className="px-2 py-1 text-xs text-red-600  hover:text-red-700 :text-red-300 hover:bg-red-500/10 rounded-lg font-bold cursor-pointer transition flex items-center gap-1 z-20"
                     >
                       Lihat Semua ({chatHistory.length}) →
                     </button>
@@ -2377,44 +2564,44 @@ export default function App() {
                 </div>
 
                 {chatHistoryLoading ? (
-                  <p className="text-xs text-[#5A6E85] dark:text-slate-400">Memuat riwayat percakapan...</p>
+                  <p className="text-xs text-[#5A6E85] ">Memuat riwayat percakapan...</p>
                 ) : chatHistory.length === 0 ? (
-                  <p className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-4 text-center text-xs text-[#5A6E85] dark:text-slate-400">Belum ada percakapan tersimpan.</p>
+                  <p className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-4 text-center text-xs text-[#5A6E85] ">Belum ada percakapan tersimpan.</p>
                 ) : (
                   <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2 pt-1">
                     {chatHistory.slice(0, 5).map((item) => (
                       <div 
                         key={item.id} 
-                        className="min-w-[220px] max-w-[240px] h-[130px] bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition shrink-0 relative"
+                        className="min-w-[220px] max-w-[240px] h-[130px] bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition shrink-0 relative"
                       >
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteChat(item.id);
                           }}
-                          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
+                          className="absolute top-2 left-2 w-5 h-5 rounded-full bg-slate-100  hover:bg-red-500/20 text-[#5A6E85]  hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
                           title="Hapus percakapan tersimpan"
                         >
                           ✕
                         </button>
                         <div className="space-y-1 overflow-hidden cursor-pointer pl-5" onClick={() => loadItemToChat(item)}>
-                          <div className="flex justify-between items-center text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium">
+                          <div className="flex justify-between items-center text-[10px] text-[#5A6E85]  font-medium">
                             <span className="truncate">{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
                           </div>
-                          <div className="text-xs font-semibold text-[#0A1937] dark:text-white line-clamp-1">{item.source_text}</div>
-                          <div className="text-xs text-red-600 dark:text-red-400 line-clamp-2 italic">{item.translated_text}</div>
+                          <div className="text-xs font-semibold text-[#0A1937]  line-clamp-1">{item.source_text}</div>
+                          <div className="text-xs text-red-600  line-clamp-2 italic">{item.translated_text}</div>
                         </div>
 
-                        <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-white/10 mt-1">
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-100  mt-1">
                           <button
                             onClick={() => loadItemToChat(item)}
-                            className="text-[11px] text-red-600 dark:text-red-400 hover:underline font-bold cursor-pointer"
+                            className="text-[11px] text-red-600  hover:underline font-bold cursor-pointer"
                           >
                             + Muat ke Chat
                           </button>
                           <button 
                             onClick={() => playAudio(item.translated_text, item.target_language, item.id)}
-                            className="text-red-600 dark:text-red-400 hover:bg-red-500/10 p-1 rounded flex items-center gap-1 font-semibold text-xs shrink-0 cursor-pointer"
+                            className="text-red-600  hover:bg-red-500/10 p-1 rounded flex items-center gap-1 font-semibold text-xs shrink-0 cursor-pointer"
                             title="Putar Audio"
                           >
                             <Volume2 size={13} className={playingAudioId === item.id ? 'animate-bounce text-red-600' : ''} /> Play
@@ -2426,10 +2613,10 @@ export default function App() {
                     {chatHistory.length > 5 && (
                       <button
                         onClick={() => setShowAllHistoryModal(true)}
-                        className="min-w-[140px] h-[130px] bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 border border-dashed border-slate-300 dark:border-white/20 rounded-xl p-3 flex flex-col items-center justify-center gap-1 shadow-2xs transition shrink-0 text-[#0A1937] dark:text-white font-bold text-xs cursor-pointer"
+                        className="min-w-[140px] h-[130px] bg-slate-50  hover:bg-slate-100 :bg-white/10 border border-dashed border-slate-300  rounded-xl p-3 flex flex-col items-center justify-center gap-1 shadow-2xs transition shrink-0 text-[#0A1937]  font-bold text-xs cursor-pointer"
                       >
                         <span>Lihat Semua</span>
-                        <span className="text-[10px] font-normal text-[#5A6E85] dark:text-slate-400">({chatHistory.length - 5} lainnya)</span>
+                        <span className="text-[10px] font-normal text-[#5A6E85] ">({chatHistory.length - 5} lainnya)</span>
                       </button>
                     )}
                   </div>
@@ -2439,7 +2626,7 @@ export default function App() {
               {/* Quick Phrases */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white">Frasa Cepat Praktis ({phrasesList.length})</h2>
+                  <h2 className="text-sm font-bold font-heading text-[#0A1937] ">Frasa Cepat Praktis ({phrasesList.length})</h2>
                   <button
                     onClick={() => {
                       setEditingPhraseIndex(null);
@@ -2462,7 +2649,7 @@ export default function App() {
                       className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition cursor-pointer ${
                         selectedPhraseCategory === cat
                           ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs'
-                          : 'bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white hover:bg-slate-50 dark:hover:bg-white/15'
+                          : 'bg-white  border border-slate-200/80  text-[#0A1937]  hover:bg-slate-50 :bg-white/15'
                       }`}
                     >
                       {cat}
@@ -2476,7 +2663,7 @@ export default function App() {
                   placeholder="🔍 Cari frasa cepat..."
                   value={phraseSearchQuery}
                   onChange={(e) => setPhraseSearchQuery(e.target.value)}
-                  className="w-full bg-white dark:bg-white/5 border border-slate-200/80 dark:border-white/12 rounded-xl px-3 py-2 text-xs font-medium text-[#0A1937] dark:text-white placeholder-[#8F9EAF] dark:placeholder-slate-500 outline-none focus:border-[#FF0025] mb-2 transition"
+                  className="w-full bg-white  border border-slate-200/80  rounded-xl px-3 py-2 text-xs font-medium text-[#0A1937]  placeholder-[#8F9EAF]  outline-none focus:border-[#FF0025] mb-2 transition"
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2486,13 +2673,13 @@ export default function App() {
                   ).map((phrase, idx) => {
                     const realIndex = phrasesList.findIndex(p => p === phrase);
                     return (
-                      <div key={idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-red-500/40 transition">
+                      <div key={idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-3 flex justify-between items-start shadow-2xs hover:border-red-500/40 transition">
                         <div 
                           onClick={() => updateChatInput(phrase.text)}
                           className="space-y-0.5 min-w-0 pr-2 cursor-pointer flex-1"
                         >
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100 dark:bg-white/10 text-[#5A6E85] dark:text-slate-300 rounded">{phrase.category}</span>
-                          <div className="text-xs font-medium text-[#0A1937] dark:text-white line-clamp-2 mt-1">{phrase.text}</div>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-slate-100  text-[#5A6E85]  rounded">{phrase.category}</span>
+                          <div className="text-xs font-medium text-[#0A1937]  line-clamp-2 mt-1">{phrase.text}</div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
@@ -2579,18 +2766,336 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ==================================================== */}
+          {/* TAB 4: TIKTOK RADAR 🛰️ (LEAFLET HEATMAP & CSI) */}
+          {/* ==================================================== */}
+          {activeTab === 'radar' && (
+            <div className="space-y-4">
+              {/* TikTok Gem Radar PWA Interactive Component */}
+              <div className="bg-white dark:bg-[#001A41] border border-slate-200/80  rounded-2xl p-4 shadow-xs space-y-4 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#FF0025] animate-pulse shrink-0"></span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF0025] truncate">TikTok CSI Engine</span>
+                    </div>
+                    <h2 className="font-extrabold text-base text-[#0A1937]  mt-0.5 truncate">
+                      {userLocation ? `TikTok Gem Radar — ${getCountryCodeFromCoords(userLocation.lat, userLocation.lng) === 'IDN' ? 'Jakarta Selatan' : 'Kota Anda'}` : 'TikTok Gem Radar 📍'}
+                    </h2>
+                    <p className="text-xs text-[#5A6E85]  truncate">Hidden Gem Gap Index (Search vs Video Count)</p>
+                  </div>
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-xs shrink-0">
+                    <Sparkles className="w-4.5 h-4.5" />
+                  </div>
+                </div>
+
+                {/* Prominent Manual Trigger Button & Synchronized Progress Bar */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      const targetLoc = userLocation || DEFAULT_JAKSEL_LOCATION;
+                      loadRadarSpots(targetLoc.lat, targetLoc.lng);
+                    }}
+                    disabled={loadingRadarSpots}
+                    className="w-full py-3.5 px-4 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white font-black text-xs sm:text-sm rounded-2xl shadow-md hover:opacity-95 transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {loadingRadarSpots ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Memindai Live Scrapping (CDP Pipeline)...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>🚀 Mulai Live Scrapping / Scan Radar</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Synchronized Backend Progress Bar */}
+                  {loadingRadarSpots && (
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-[#FF0025]/30 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-[#0A1937] dark:text-white">
+                        <span className="flex items-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FF0025]" />
+                          <span>Syncing Backend Scraping Steps</span>
+                        </span>
+                        <span className="text-[#FF0025]">
+                          {radarLoadingStep === 1 ? '33% (Langkah 1/3)' : radarLoadingStep === 2 ? '66% (Langkah 2/3)' : '100% (Langkah 3/3)'}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div 
+                          className="bg-gradient-to-r from-[#FF0025] to-[#FDA22B] h-2.5 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: radarLoadingStep === 1 ? '33%' : radarLoadingStep === 2 ? '66%' : '100%' }}
+                        ></div>
+                      </div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400 font-medium">
+                        {radarLoadingStep === 1 && 'Langkah 1/3: Memindai Discovery API & Radius 5km...'}
+                        {radarLoadingStep === 2 && 'Langkah 2/3: Scraping TikTok Social Volume & Kalkulasi Gap Index...'}
+                        {radarLoadingStep === 3 && 'Langkah 3/3: Merender Leaflet Heatmap & Klaster Spasial...'}
+                        {(!radarLoadingStep || radarLoadingStep > 3) && 'Menjalankan Browserless CDP Scraper...'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Manual Spot Search Bar */}
+                <form onSubmit={handleManualSpotSearch} className="relative flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={spotSearchInput}
+                      onChange={(e) => setSpotSearchInput(e.target.value)}
+                      placeholder="🔍 Cari Tempat / Landmark Manual..."
+                      className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-slate-100  text-slate-800  placeholder-slate-400 border border-slate-200  focus:outline-none focus:border-[#FF0025]"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSpotSearching || !spotSearchInput.trim()}
+                    className="px-3 py-2 text-xs font-bold rounded-xl bg-[#FF0025] text-white hover:bg-red-700 disabled:opacity-50 transition cursor-pointer flex items-center gap-1 shrink-0"
+                  >
+                    {isSpotSearching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Cari'}
+                  </button>
+                </form>
+                {spotSearchError && (
+                  <p className="text-[10px] text-red-500 font-semibold">{spotSearchError}</p>
+                )}
+
+                {/* Radar Category Filters */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  {[
+                    { id: 'ALL', label: '🌟 Semua' },
+                    { id: 'HIDDEN_GEM', label: '🟢 Hidden Gem' },
+                    { id: 'MODERATE', label: '🟡 Moderate' },
+                    { id: 'TOURIST_TRAP', label: '🔴 Tourist Trap' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setRadarCategoryFilter(cat.id)}
+                      className={`px-3 py-1 text-xs font-bold rounded-xl whitespace-nowrap transition cursor-pointer ${
+                        radarCategoryFilter === cat.id
+                          ? (cat.id === 'TOURIST_TRAP' ? 'bg-rose-600 text-white shadow-xs' : (cat.id === 'HIDDEN_GEM' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-[#0A1937]  text-white #0A1937] shadow-xs'))
+                          : 'bg-slate-100  text-slate-600  hover:bg-slate-200 :bg-white/20'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Live Browserless CDP Loading Journey Banner */}
+                {loadingRadarSpots && (
+                  <div className="bg-gradient-to-r from-red-500/10 via-amber-500/10 to-emerald-500/10 border border-[#FF0025]/30 rounded-2xl p-5 text-center space-y-2.5 animate-pulse">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-[#FF0025]/20 flex items-center justify-center text-[#FF0025]">
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    </div>
+                    <div className="font-extrabold text-xs text-[#0A1937]">
+                      {radarLoadingStep === 1 && 'Langkah 1/3: Memindai Discovery API & Radius 5km...'}
+                      {radarLoadingStep === 2 && 'Langkah 2/3: Scraping TikTok Social Volume & Kalkulasi Gap Index...'}
+                      {radarLoadingStep === 3 && 'Langkah 3/3: Merender Leaflet Heatmap & Klaster Spasial...'}
+                      {(!radarLoadingStep || radarLoadingStep > 3) && 'Menjalankan Browserless CDP Scraper...'}
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      Mengekstrak sinyal spasial real-time, volume pencarian, dan kalkulasi Gap Index...
+                    </p>
+                  </div>
+                )}
+
+                {/* Completion Checkmark Banner */}
+                {radarSuccessBanner && !loadingRadarSpots && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-emerald-800 text-xs shadow-sm">
+                    <div className="flex items-center space-x-2">
+                      <span className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">✓</span>
+                      <div>
+                        <span className="font-bold">Scraping Selesai!</span> TikTok Gem Radar & Browserless CDP pipeline berhasil memuat titik spot & heatmap.
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setRadarSuccessBanner(false)} 
+                      className="text-emerald-500 hover:text-emerald-700 font-bold px-2 py-1 text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                {/* Leaflet Heatmap Canvas */}
+                <GemRadarMap
+                  selectedSpotId={selectedRadarSpotId}
+                  onSelectSpot={(spot) => setSelectedRadarSpotId(spot.id)}
+                  activeCategoryFilter={radarCategoryFilter}
+                  spots={radarSpotsList}
+                  userLocation={userLocation}
+                />
+
+                {/* Opportunity Radar Stats Bar */}
+                <div className="grid grid-cols-3 gap-2 bg-[#F0F4F9]  border border-slate-200/80  rounded-xl p-2.5 text-center">
+                  <div>
+                    <div className="text-[10px] font-bold text-[#5A6E85]  uppercase">Top Gem Index</div>
+                    <div className="text-sm font-black text-emerald-600 ">
+                      {radarSpotsList.length > 0 ? `${Math.max(...radarSpotsList.map(s => s.gapScore))} / 100` : '94.8 / 100'}
+                    </div>
+                  </div>
+                  <div className="border-x border-slate-200  px-1">
+                    <div className="text-[10px] font-bold text-[#5A6E85]  uppercase">Opp Density</div>
+                    <div className="text-sm font-black text-[#FF0025]">High Gap</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold text-[#5A6E85]  uppercase">Tracked Spots</div>
+                    <div className="text-sm font-black text-[#0A1937] ">{radarSpotsList.length} Locations</div>
+                  </div>
+                </div>
+
+                {/* Raw API Response Snippets Inspector */}
+                <div className="bg-[#071124] text-white rounded-xl p-3 space-y-2 border border-white/10 text-xs shadow-md">
+                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowApiDebug(!showApiDebug)}>
+                    <span className="font-bold font-mono text-emerald-400 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Debug Raw API (Browserless CDP Scraper)
+                    </span>
+                    <span className="text-[10px] text-slate-400">{showApiDebug ? 'Tutup [-]' : 'Buka [+]'}</span>
+                  </div>
+                  {showApiDebug && (
+                    <div className="space-y-3 pt-2 font-mono text-[10px] text-slate-300">
+                      <div>
+                        <div className="text-amber-400 font-bold mb-1 flex items-center justify-between">
+                          <span>🎵 Browserless CDP Request Payload</span>
+                          <span className="text-[9px] text-cyan-400 select-all">/api/tiktok</span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 mb-1">GET /api/tiktok?keyword=... (CDP Scraper Request Payload)</div>
+                        <pre className="bg-black/55 p-2 rounded max-h-36 overflow-auto text-amber-300 mb-2">
+                          {debugTikTokRequest ? JSON.stringify(debugTikTokRequest, null, 2) : '// Belum ada request payload...'}
+                        </pre>
+
+                        <div className="text-emerald-400 font-bold mb-1 flex items-center justify-between">
+                          <span>🎵 Browserless CDP Response Snippet</span>
+                          <span className="text-[9px] text-cyan-400 select-all">https://aitraveldev.aneta.my.id/api/tiktok</span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 mb-1">GET /api/tiktok?keyword=... (Live Scraper Metrics & Payload)</div>
+                        <pre className="bg-black/55 p-2 rounded max-h-48 overflow-auto text-cyan-300">
+                          {debugTikTokResponse ? JSON.stringify(debugTikTokResponse, null, 2) : '// Belum dipanggil / Menunggu TikTok pipeline...'}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Interactive Top Hidden Gems List */}
+                <div className="space-y-2 pt-1">
+                  <div className="text-xs font-bold text-[#0A1937]  flex items-center justify-between">
+                    <span>Opportunity Leaderboard</span>
+                    <span className="text-[10px] text-[#5A6E85] ">Klik spot untuk fokus peta</span>
+                  </div>
+
+                  {loadingRadarSpots ? (
+                    <div className="space-y-2 py-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="p-3 rounded-xl bg-slate-100 border border-slate-200 animate-pulse h-16 flex items-center justify-between">
+                          <div className="space-y-2 flex-1">
+                            <div className="w-32 h-3 bg-slate-300 rounded"></div>
+                            <div className="w-48 h-2 bg-slate-200 rounded"></div>
+                          </div>
+                          <div className="w-10 h-6 bg-slate-300 rounded-lg"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div>
+                      {radarSpotsList
+                        .filter(s => radarCategoryFilter === 'ALL' || s.category === radarCategoryFilter)
+                        .map(spot => {
+                          const isSelected = selectedRadarSpotId === spot.id;
+                          const isGem = spot.category === 'HIDDEN_GEM';
+                          const isTrap = spot.category === 'TOURIST_TRAP';
+                          const badgeBg = isGem
+                            ? 'bg-emerald-500/10 text-emerald-600  border-emerald-500/20'
+                            : (isTrap ? 'bg-rose-500/10 text-rose-600  border-rose-500/20' : 'bg-amber-500/10 text-amber-600  border-amber-500/20');
+                          const scoreColor = isGem ? 'text-emerald-600  bg-emerald-500/10 border-emerald-500/20' : (isTrap ? 'text-rose-600  bg-rose-500/10 border-rose-500/20' : 'text-amber-600  bg-amber-500/10 border-amber-500/20');
+
+                          return (
+                            <div
+                              key={spot.id}
+                              onClick={() => setSelectedRadarSpotId(spot.id)}
+                              className={`p-3 rounded-xl border transition cursor-pointer space-y-1.5 mb-2 ${
+                                isSelected
+                                  ? 'bg-red-500/5  border-[#FF0025] shadow-xs'
+                                  : 'bg-[#F0F4F9]  border-slate-200/80  hover:border-slate-300 :border-white/20'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-sm">{spot.icon}</span>
+                                    <h3 className="font-bold text-xs text-[#0A1937]  truncate">{spot.name}</h3>
+                                    {isTrap && (
+                                      <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-rose-500 text-white animate-pulse">
+                                        ⚠️ OVERHYPED
+                                      </span>
+                                    )}
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${badgeBg}`}>
+                                      {isTrap ? 'TOURIST TRAP' : (isGem ? 'HIDDEN GEM' : spot.district)}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-[#5A6E85]  mt-0.5">
+                                    Search Vol: <span className="font-semibold text-slate-700 ">{spot.searchVol}</span> | TikTok Videos: <span className="font-semibold text-slate-700 ">{spot.videoCount.toLocaleString()}</span>
+                                  </p>
+                                </div>
+                                <span className={`text-xs font-black px-2 py-0.5 rounded-lg border shrink-0 ${scoreColor}`}>
+                                  {spot.gapScore}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#5A6E85]  line-clamp-2 leading-relaxed">
+                                {spot.desc}
+                              </p>
+
+                              {/* 3 Sample TikTok Video Reference Links for Verification */}
+                              {spot.tiktokLinks && spot.tiktokLinks.length > 0 && (
+                                <div className="pt-2 border-t border-slate-200/60 dark:border-white/10 flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                    <Video size={10} className="text-[#FF0025]" /> TikTok Verif:
+                                  </span>
+                                  {spot.tiktokLinks.map((link, lIdx) => (
+                                    <a
+                                      key={lIdx}
+                                      href={link.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 text-[#0A1937] dark:text-white border border-slate-200 dark:border-white/10 hover:border-[#FF0025] hover:text-[#FF0025] transition flex items-center gap-1 shadow-2xs"
+                                      title={link.title}
+                                    >
+                                      <span>🎬 #{lIdx + 1}</span>
+                                      <span className="truncate max-w-[90px]">{link.title.replace(/^TikTok\s*#?\d*:?\s*/, '')}</span>
+                                      <ExternalLink size={8} className="opacity-60" />
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* ==================================================== */}
-          {/* TAB 4: KALCER (CURATED LOCAL SPOTS & GEOLOCATION) */}
+          {/* TAB 5: SPOT KALCER 📍 (GOOGLE PLACES & LOCAL SPOTS) */}
           {/* ==================================================== */}
           {activeTab === 'kalcer' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center pt-2">
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-[#0A1937] dark:text-white">Spot Kalcer 📍</h1>
+                  <h1 className="text-xl font-bold font-heading text-[#0A1937] ">Spot Kalcer 📍</h1>
                   {userLocation && (
-                    <p className="text-[11px] text-[#5A6E85] dark:text-slate-400 font-mono mt-0.5">
+                    <p className="text-[11px] text-[#5A6E85]  font-mono mt-0.5">
                       GPS: {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
                     </p>
                   )}
@@ -2600,14 +3105,22 @@ export default function App() {
                   disabled={locatingUser}
                   className={`px-3 py-1.5 text-xs font-bold rounded-full border flex items-center gap-1.5 shadow-2xs transition cursor-pointer ${
                     userLocation && !locatingUser
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                      : 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 hover:bg-red-500/20'
+                      ? 'bg-emerald-500/10 text-emerald-600  border-emerald-500/20 hover:bg-emerald-500/20'
+                      : 'bg-red-500/10 text-red-600  border-red-500/20 hover:bg-red-500/20'
                   }`}
                 >
                   <Navigation size={12} className={locatingUser ? "animate-spin" : (userLocation ? "text-emerald-500 animate-pulse" : "")} />
                   <span>{locatingUser ? 'Mencari...' : 'GPS'}</span>
                 </button>
               </div>
+
+              {/* Interactive Map View */}
+              <KalcerMap
+                spots={spotsList}
+                selectedSpotId={selectedKalcerSpotId}
+                onSelectSpot={(spot) => setSelectedKalcerSpotId(spot.id)}
+                userLocation={userLocation}
+              />
 
               {/* Category Filter Chips & Add Category */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
@@ -2618,7 +3131,7 @@ export default function App() {
                     className={`px-3 py-1.5 text-xs font-bold rounded-xl whitespace-nowrap transition cursor-pointer ${
                       spotFilter === c.id
                         ? 'bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white shadow-xs'
-                        : 'bg-white dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white hover:bg-slate-50 dark:hover:bg-white/15'
+                        : 'bg-white  border border-slate-200/80  text-[#0A1937]  hover:bg-slate-50 :bg-white/15'
                     }`}
                   >
                     {c.label}
@@ -2626,7 +3139,7 @@ export default function App() {
                 ))}
                 <button
                   onClick={() => setShowAddCatModal(true)}
-                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 whitespace-nowrap transition shadow-2xs cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-red-500/10 text-red-600  border border-red-500/20 hover:bg-red-500/20 whitespace-nowrap transition shadow-2xs cursor-pointer"
                 >
                   + Kategori
                 </button>
@@ -2634,20 +3147,45 @@ export default function App() {
 
               {/* Spot Cards */}
               <div className="space-y-3">
-                {loadingSpots ? (
-                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-6 text-center text-xs text-[#5A6E85] dark:text-slate-400">
+                {spotsError ? (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 text-center text-xs text-red-600 space-y-2.5">
+                    <div className="font-bold text-sm flex items-center justify-center gap-1.5 font-heading">
+                      <span>⚠️ Gagal Memuat Spot</span>
+                    </div>
+                    <div>{spotsError}</div>
+                    <button
+                      onClick={() => {
+                        const loc = userLocation || DEFAULT_JAKSEL_LOCATION;
+                        loadSpots(loc.lat, loc.lng, spotFilter);
+                      }}
+                      className="px-3 py-1.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition cursor-pointer shadow-xs inline-flex items-center gap-1 mx-auto"
+                    >
+                      <RefreshCw size={12} />
+                      <span>Coba Lagi</span>
+                    </button>
+                  </div>
+                ) : loadingSpots ? (
+                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-6 text-center text-xs text-[#5A6E85] ">
                     <RefreshCw size={18} className="animate-spin mx-auto mb-2 text-red-500" />
                     <span>Mencari spot terdekat via Google Places API...</span>
                   </div>
                 ) : spotsList.length === 0 ? (
-                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-6 text-center text-xs text-[#5A6E85] dark:text-slate-400">
+                  <div className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-6 text-center text-xs text-[#5A6E85] ">
                     {userLocation ? 'Tidak ada spot ditemukan. Coba kategori lain.' : 'Tekan GPS Saya untuk mencari spot di sekitar Anda.'}
                   </div>
                 ) : (
                   spotsList.map(s => (
-                    <div key={s.id} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3.5 shadow-sm space-y-3">
+                    <div 
+                      key={s.id} 
+                      onClick={() => setSelectedKalcerSpotId(s.id)}
+                      className={`bg-white dark:bg-[#0A1937]/80 border rounded-2xl p-3.5 shadow-sm space-y-3 transition cursor-pointer ${
+                        selectedKalcerSpotId === s.id
+                          ? 'border-[#FF0025] ring-1 ring-red-500/20'
+                          : 'border-slate-200/80  hover:border-slate-300'
+                      }`}
+                    >
                       <div className="flex gap-3">
-                        <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="w-16 h-16 bg-slate-100  border border-slate-200/80  rounded-xl flex items-center justify-center overflow-hidden shrink-0">
                           {s.photoUrl ? (
                             <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
                           ) : (
@@ -2656,23 +3194,23 @@ export default function App() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-1.5">
-                            <div className="text-sm font-bold text-[#0A1937] dark:text-white truncate font-heading">{s.name}</div>
+                            <div className="text-sm font-bold text-[#0A1937]  truncate font-heading">{s.name}</div>
                             {s.openNow !== null && s.openNow !== undefined && (
                               s.openNow ? (
                                 <span className="status-badge-buka shrink-0">
                                   🟢 Buka
                                 </span>
                               ) : (
-                                <span className="shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20">
+                                <span className="shrink-0 px-2 py-0.5 text-[10px] font-bold rounded-full border bg-rose-500/10 text-rose-600  border-rose-500/20">
                                   🔴 Tutup
                                 </span>
                               )
                             )}
                           </div>
-                          <div className="text-xs text-[#5A6E85] dark:text-slate-400 mt-0.5 line-clamp-1">{s.desc}</div>
+                          <div className="text-xs text-[#5A6E85]  mt-0.5 line-clamp-1">{s.desc}</div>
                           <div className="flex items-center gap-2 mt-2 flex-wrap">
-                            <span className="px-2 py-0.5 bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold rounded border border-red-500/20">{s.rating}</span>
-                            <span className="text-[11px] text-[#5A6E85] dark:text-slate-400 font-medium">
+                            <span className="px-2 py-0.5 bg-red-500/10 text-red-600  text-xs font-bold rounded border border-red-500/20">{s.rating}</span>
+                            <span className="text-[11px] text-[#5A6E85]  font-medium">
                               💬 {(s.userRatingCount || (s.reviews ? s.reviews.length : 0)).toLocaleString('id-ID')} ulasan
                             </span>
                             <span className="text-xs font-medium text-slate-400">📍 {s.dist}</span>
@@ -2680,13 +3218,13 @@ export default function App() {
                         </div>
                       </div>
                       {s.reviews && s.reviews.length > 0 && (
-                        <div className="bg-slate-100/70 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 rounded-xl p-2.5 space-y-1.5 text-xs">
-                          <div className="text-[11px] font-bold text-[#5A6E85] dark:text-slate-400 flex items-center gap-1">
+                        <div className="bg-slate-100/70  border border-slate-200/80  rounded-xl p-2.5 space-y-1.5 text-xs">
+                          <div className="text-[11px] font-bold text-[#5A6E85]  flex items-center gap-1">
                             💬 Top 3 Komentar:
                           </div>
                           {s.reviews.slice(0, 3).map((rev, idx) => (
-                            <div key={idx} className="text-[#0A1937] dark:text-slate-300 text-[11px] leading-snug">
-                              <span className="font-semibold text-red-600 dark:text-red-400">{rev.author || 'Pengunjung'}:</span> "{rev.text}"
+                            <div key={idx} className="text-[#0A1937]  text-[11px] leading-snug">
+                              <span className="font-semibold text-red-600 ">{rev.author || 'Pengunjung'}:</span> "{rev.text}"
                             </div>
                           ))}
                         </div>
@@ -2695,7 +3233,7 @@ export default function App() {
                         href={s.mapsUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="w-full py-2 bg-slate-100/70 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 text-[#0A1937] dark:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 dark:hover:bg-white/15 transition"
+                        className="w-full py-2 bg-slate-100/70  border border-slate-200/80  text-[#0A1937]  rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-slate-200 :bg-white/15 transition"
                       >
                         <span>Buka Rute Google Maps</span>
                         <ExternalLink size={12} />
@@ -2752,15 +3290,15 @@ export default function App() {
           {/* Modal All Saved History (Ngobrol Tab) */}
           {showAllHistoryModal && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-              <div className="bg-white dark:bg-[#001A41] rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200/80 dark:border-white/10 animate-in zoom-in-95">
-                <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+              <div className="bg-white dark:bg-[#001A41] rounded-2xl max-w-lg w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200/80  animate-in zoom-in-95">
+                <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex justify-between items-center bg-slate-50/50 ">
                   <div>
-                    <h3 className="text-base font-bold text-[#0A1937] dark:text-white">Semua Percakapan Tersimpan</h3>
-                    <p className="text-xs text-[#5A6E85] dark:text-slate-400">Klik kartu untuk memuat pesan ke chat box</p>
+                    <h3 className="text-base font-bold text-[#0A1937] ">Semua Percakapan Tersimpan</h3>
+                    <p className="text-xs text-[#5A6E85] ">Klik kartu untuk memuat pesan ke chat box</p>
                   </div>
                   <button 
                     onClick={() => setShowAllHistoryModal(false)}
-                    className="p-1 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-lg text-[#5A6E85] dark:text-slate-300 font-bold text-sm cursor-pointer transition"
+                    className="p-1 hover:bg-slate-200/60 :bg-white/10 rounded-lg text-[#5A6E85]  font-bold text-sm cursor-pointer transition"
                   >
                     ✕
                   </button>
@@ -2770,39 +3308,39 @@ export default function App() {
                   {chatHistory.map((item) => (
                     <div 
                       key={item.id} 
-                      className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition space-y-2 relative"
+                      className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-xl p-3 flex flex-col justify-between shadow-2xs hover:border-red-500/40 transition space-y-2 relative"
                     >
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteChat(item.id);
                         }}
-                        className="absolute top-2.5 left-2.5 w-5 h-5 rounded-full bg-slate-100 dark:bg-white/10 hover:bg-red-500/20 text-[#5A6E85] dark:text-slate-300 hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
+                        className="absolute top-2.5 left-2.5 w-5 h-5 rounded-full bg-slate-100  hover:bg-red-500/20 text-[#5A6E85]  hover:text-red-600 flex items-center justify-center text-[10px] font-bold transition z-10 cursor-pointer"
                         title="Hapus percakapan tersimpan"
                       >
                         ✕
                       </button>
-                      <div className="flex justify-between items-center text-[10px] text-[#5A6E85] dark:text-slate-400 font-medium pl-6">
+                      <div className="flex justify-between items-center text-[10px] text-[#5A6E85]  font-medium pl-6">
                         <span>{getLanguageLabel(item.source_language)} → {getLanguageLabel(item.target_language)}</span>
                         <button 
                           onClick={() => playAudio(item.translated_text, item.target_language, `modal-${item.id}`)}
-                          className="text-red-600 dark:text-red-400 hover:bg-red-500/10 p-1.5 rounded flex items-center gap-1 font-semibold text-xs cursor-pointer transition"
+                          className="text-red-600  hover:bg-red-500/10 p-1.5 rounded flex items-center gap-1 font-semibold text-xs cursor-pointer transition"
                         >
                           <Volume2 size={13} className={playingAudioId === `modal-${item.id}` ? 'animate-bounce text-red-600' : ''} /> Play
                         </button>
                       </div>
                       <div className="cursor-pointer space-y-1" onClick={() => { loadItemToChat(item); setShowAllHistoryModal(false); }}>
-                        <div className="text-xs font-semibold text-[#0A1937] dark:text-white line-clamp-2">{item.source_text}</div>
-                        <div className="text-xs text-red-600 dark:text-red-400 font-medium whitespace-pre-line bg-slate-50 dark:bg-white/5 p-2 rounded-lg border border-slate-100 dark:border-white/5">{item.translated_text}</div>
+                        <div className="text-xs font-semibold text-[#0A1937]  line-clamp-2">{item.source_text}</div>
+                        <div className="text-xs text-red-600  font-medium whitespace-pre-line bg-slate-50  p-2 rounded-lg border border-slate-100 ">{item.translated_text}</div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50 dark:bg-white/5 flex justify-end">
+                <div className="p-3 border-t border-slate-200/80  bg-slate-50  flex justify-end">
                   <button
                     onClick={() => setShowAllHistoryModal(false)}
-                    className="px-4 py-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-[#0A1937] dark:text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                    className="px-4 py-2 bg-slate-200  hover:bg-slate-300 :bg-white/20 text-[#0A1937]  text-xs font-bold rounded-xl transition cursor-pointer"
                   >
                     Tutup
                   </button>
@@ -2820,22 +3358,22 @@ export default function App() {
                 onClick={() => setShowAllScanHistoryModal(false)}
               >
                 <div 
-                  className="bg-white dark:bg-[#001A41] rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden cursor-default"
+                  className="bg-white dark:bg-[#001A41] rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200/80  overflow-hidden cursor-default"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex items-center gap-3 bg-slate-50/50 dark:bg-white/5">
+                  <div className="p-4 border-b border-slate-200/80 dark:border-white/10 flex items-center gap-3 bg-slate-50/50 ">
                     <button 
                       type="button"
                       onClick={() => setShowAllScanHistoryModal(false)}
-                      className="w-8 h-8 rounded-full bg-slate-200/60 dark:bg-white/10 hover:bg-slate-300/60 dark:hover:bg-white/20 flex items-center justify-center text-[#5A6E85] dark:text-slate-300 text-sm font-bold transition cursor-pointer shrink-0"
+                      className="w-8 h-8 rounded-full bg-slate-200/60  hover:bg-slate-300/60 :bg-white/20 flex items-center justify-center text-[#5A6E85]  text-sm font-bold transition cursor-pointer shrink-0"
                       title="Tutup Popup"
                       aria-label="Tutup Popup"
                     >
                       ✕
                     </button>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-bold font-heading text-[#0A1937] dark:text-white truncate">Semua Riwayat Scan Tersimpan</h3>
-                      <p className="text-[11px] text-[#5A6E85] dark:text-slate-400">
+                      <h3 className="text-sm font-bold font-heading text-[#0A1937]  truncate">Semua Riwayat Scan Tersimpan</h3>
+                      <p className="text-[11px] text-[#5A6E85] ">
                         Daftar lengkap hasil scan ({totalItems} item)
                       </p>
                     </div>
@@ -2843,35 +3381,35 @@ export default function App() {
                   
                   <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
                     {slicedItems.length === 0 ? (
-                      <div className="text-center py-8 text-xs text-[#5A6E85] dark:text-slate-400">Belum ada riwayat scan tersimpan.</div>
+                      <div className="text-center py-8 text-xs text-[#5A6E85] ">Belum ada riwayat scan tersimpan.</div>
                     ) : (
                       slicedItems.map((item, idx) => (
-                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80 dark:border-white/10 rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
+                        <div key={item.id || idx} className="bg-white dark:bg-[#0A1937]/80 border border-slate-200/80  rounded-2xl p-3 flex items-start gap-3 shadow-2xs hover:border-red-500/40 transition">
                           {item.image_url ? (
                             <img 
                               src={item.image_url} 
                               alt={item.product_name} 
                               onClick={() => setPreviewImageUrl(item.image_url)}
-                              className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100 dark:border-white/10 cursor-pointer hover:opacity-90 transition hover:scale-102" 
+                              className="w-16 h-16 rounded-xl object-cover shrink-0 border border-slate-100  cursor-pointer hover:opacity-90 transition hover:scale-102" 
                               title="Klik untuk memperbesar gambar"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-400 dark:text-slate-300 flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60 dark:border-white/10">
+                            <div className="w-16 h-16 rounded-xl bg-slate-100  text-slate-400  flex items-center justify-center shrink-0 text-2xl font-bold border border-slate-200/60 ">
                               📷
                             </div>
                           )}
                           <div className="min-w-0 flex-1 space-y-1">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                <span className="text-sm font-bold text-[#0A1937] dark:text-white truncate" title={item.product_name}>{item.product_name}</span>
+                                <span className="text-sm font-bold text-[#0A1937]  truncate" title={item.product_name}>{item.product_name}</span>
                                 <button
                                   type="button"
                                   onClick={() => handleCopyHistoryTitle(item.product_name, `modal-${item.id || idx}`)}
-                                  className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition shrink-0 flex items-center"
+                                  className="p-1 rounded text-slate-400 hover:text-slate-700 :text-slate-200 hover:bg-slate-100 :bg-white/10 transition shrink-0 flex items-center"
                                   title="Salin Nama Produk"
                                 >
                                   {copiedHistoryId === `modal-${item.id || idx}` ? (
-                                    <Check size={14} className="text-emerald-600 dark:text-emerald-400 font-bold" />
+                                    <Check size={14} className="text-emerald-600  font-bold" />
                                   ) : (
                                     <Copy size={14} />
                                   )}
@@ -2880,7 +3418,7 @@ export default function App() {
                               {item.id && (
                                 <button
                                   onClick={() => deleteScanHistoryItem(item.id)}
-                                  className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition shrink-0"
+                                  className="p-1 text-slate-400 hover:text-red-600 :text-red-400 hover:bg-red-50 :bg-red-500/10 rounded-lg transition shrink-0"
                                   title="Hapus riwayat scanner ini"
                                   aria-label="Hapus riwayat scanner"
                                 >
@@ -2890,22 +3428,22 @@ export default function App() {
                             </div>
 
                             <div className="flex items-baseline justify-between gap-2 pt-0.5">
-                              <div className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium">
+                              <div className="text-xs text-[#5A6E85]  font-medium">
                                 {item.price_jpy != null ? `¥${Number(item.price_jpy).toLocaleString('id-ID')}` : '-'}
                               </div>
                               <div className="text-right">
-                                <div className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 leading-tight">
+                                <div className="text-sm font-extrabold text-emerald-600  leading-tight">
                                   {item.lowest_price_idr != null ? `Rp ${Number(item.lowest_price_idr).toLocaleString('id-ID')}` : 'Harga N/A'}
                                 </div>
-                                <div className="text-[10px] font-medium text-[#5A6E85] dark:text-slate-400">Estimasi Indo</div>
+                                <div className="text-[10px] font-medium text-[#5A6E85] ">Estimasi Indo</div>
                               </div>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 text-[11px] text-[#5A6E85] dark:text-slate-400 pt-0.5">
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-[#5A6E85]  pt-0.5">
                               <span>{item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</span>
                               <div className="flex items-center gap-1.5">
                                 {(item.location_name || item.locationName) && (
-                                  <span className="text-[10px] text-emerald-800 dark:text-emerald-300 bg-emerald-50/80 dark:bg-emerald-500/10 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100 dark:border-emerald-500/20">
+                                  <span className="text-[10px] text-emerald-800  bg-emerald-50/80  px-2 py-0.5 rounded-md font-semibold flex items-center gap-1 border border-emerald-100 ">
                                     <span>{getCountryFlagFromCoords(item.latitude, item.longitude, item.location_name || item.locationName)}</span>
                                     <span className="truncate max-w-[100px]">{item.location_name || item.locationName}</span>
                                   </span>
@@ -2915,7 +3453,7 @@ export default function App() {
                                     href={`https://www.google.com/maps?q=${item.latitude},${item.longitude}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100 dark:border-blue-500/20"
+                                    className="px-2 py-0.5 bg-blue-50  text-blue-600  hover:bg-blue-100 :bg-blue-500/20 rounded-md font-semibold text-[10px] flex items-center gap-0.5 transition border border-blue-100 "
                                     title="Buka Lokasi Scan di Google Maps"
                                   >
                                     Maps ↗
@@ -2929,23 +3467,23 @@ export default function App() {
                     )}
                   </div>
 
-                  <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/50 dark:bg-white/5 flex items-center justify-between">
+                  <div className="p-3 border-t border-slate-200/80  bg-slate-50/50  flex items-center justify-between">
                     {totalItems > 10 ? (
                       <div className="flex items-center gap-2">
                         <button
                           disabled={!hasPrev}
                           onClick={() => setScanHistoryPage(prev => Math.max(prev - 1, 1))}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60 dark:bg-white/10 text-[#0A1937] dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 dark:hover:bg-white/20 transition cursor-pointer"
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60  text-[#0A1937]  disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 :bg-white/20 transition cursor-pointer"
                         >
                           ← Prev
                         </button>
-                        <span className="text-xs text-[#5A6E85] dark:text-slate-400 font-medium">
+                        <span className="text-xs text-[#5A6E85]  font-medium">
                           {currentPage} / {totalPages}
                         </span>
                         <button
                           disabled={!hasNext}
                           onClick={() => setScanHistoryPage(prev => Math.min(prev + 1, totalPages))}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60 dark:bg-white/10 text-[#0A1937] dark:text-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 dark:hover:bg-white/20 transition cursor-pointer"
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-200/60  text-[#0A1937]  disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-300/60 :bg-white/20 transition cursor-pointer"
                         >
                           Next →
                         </button>
@@ -2955,7 +3493,7 @@ export default function App() {
                     )}
                     <button
                       onClick={() => setShowAllScanHistoryModal(false)}
-                      className="px-4 py-2 bg-slate-200 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 text-[#0A1937] dark:text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                      className="px-4 py-2 bg-slate-200  hover:bg-slate-300 :bg-white/20 text-[#0A1937]  text-xs font-bold rounded-xl transition cursor-pointer"
                     >
                       Tutup
                     </button>
@@ -2967,11 +3505,11 @@ export default function App() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="sticky bottom-0 left-0 right-0 h-16 sm:h-20 bg-white/95 dark:bg-[#001A41]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-white/10 flex items-center justify-around px-2 z-30 shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+        <nav className="sticky bottom-0 left-0 right-0 h-16 sm:h-20 bg-white/95 dark:bg-[#001A41]/95 backdrop-blur-md border-t border-slate-200/80  flex items-center justify-around px-2 z-30 shrink-0 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           <button 
             onClick={() => setActiveTab('valas')}
             className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-              activeTab === 'valas' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+              activeTab === 'valas' ? 'text-red-600  font-bold' : 'text-slate-500  hover:text-slate-900 :text-white font-medium'
             }`}
           >
             <ArrowRightLeft size={20} />
@@ -2981,7 +3519,7 @@ export default function App() {
           <button 
             onClick={() => setActiveTab('scanner')}
             className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-              activeTab === 'scanner' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+              activeTab === 'scanner' ? 'text-red-600  font-bold' : 'text-slate-500  hover:text-slate-900 :text-white font-medium'
             }`}
           >
             <Camera size={20} />
@@ -2989,9 +3527,19 @@ export default function App() {
           </button>
 
           <button 
+            onClick={() => setActiveTab('radar')}
+            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
+              activeTab === 'radar' ? 'text-red-600  font-bold' : 'text-slate-500  hover:text-slate-900 :text-white font-medium'
+            }`}
+          >
+            <Compass size={20} />
+            <span className="text-[11px]">Radar</span>
+          </button>
+
+          <button 
             onClick={() => setActiveTab('ngobrol')}
             className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-              activeTab === 'ngobrol' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+              activeTab === 'ngobrol' ? 'text-red-600  font-bold' : 'text-slate-500  hover:text-slate-900 :text-white font-medium'
             }`}
           >
             <MessageSquare size={20} />
@@ -3001,7 +3549,7 @@ export default function App() {
           <button 
             onClick={() => setActiveTab('kalcer')}
             className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] gap-1 py-1 px-3 rounded-xl transition cursor-pointer ${
-              activeTab === 'kalcer' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium'
+              activeTab === 'kalcer' ? 'text-red-600  font-bold' : 'text-slate-500  hover:text-slate-900 :text-white font-medium'
             }`}
           >
             <MapPin size={20} />

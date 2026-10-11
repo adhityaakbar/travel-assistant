@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant — Full User Journey & Heatmap Exploration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              navy: '#060B14',
+              card: '#0D1627',
+              border: 'rgba(255, 255, 255, 0.08)',
+              red: '#FF0025',
+              orange: '#FDA22B',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #060B14; color: #f8fafc; font-family: "Plus Jakarta Sans", sans-serif; }
+    .card-glass { background: #0D1627; border: 1px solid rgba(255, 255, 255, 0.08); }
+    .journey-step { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .journey-step:hover { border-color: rgba(255, 0, 37, 0.4); transform: translateY(-2px); }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-6 max-w-md mx-auto space-y-6 pb-12">
+
+  <!-- Header Design -->
+  <div class="flex items-center justify-between border-b border-white/10 pb-4">
+    <div>
+      <h1 class="text-base font-extrabold text-white flex items-center gap-2">
+        ✨ Travel Assistant Journey
+      </h1>
+      <p class="text-xs text-slate-400">AI Direct Search & Location Heatmap Discovery</p>
+    </div>
+    <span class="px-2 py-1 text-[10px] font-mono bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-bold">PROTOTYPE</span>
+  </div>
+
+  <!-- TAB SWITCHER POLA INTEGRASI -->
+  <div class="flex bg-black/40 p-1 rounded-xl border border-white/5 text-xs font-mono">
+    <button id="tabPola1" onclick="switchPola('pola1')" class="flex-1 py-2 rounded-lg bg-[#FF0025] text-white font-bold transition shadow-lg shadow-red-500/20">
+      Pola 1: Direct Chat
+    </button>
+    <button id="tabPola2" onclick="switchPola('pola2')" class="flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition">
+      Pola 2: Map Trigger
+    </button>
+  </div>
+
+  <!-- POLA 1: DIRECT SEARCH CHAT JOURNEY -->
+  <div id="pola1View" class="space-y-4">
+    <div class="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+      Journey Flow — User Chat Query
+    </div>
+
+    <!-- Step 1: User Chat Input -->
+    <div class="journey-step card-glass rounded-2xl p-4 space-y-2">
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span class="px-2 py-0.5 bg-white/10 rounded-md text-white font-bold">STEP 1</span>
+        <span>User Chat Input</span>
+      </div>
+      <div class="bg-black/50 p-3 rounded-xl border border-white/5 space-y-1">
+        <div class="text-[10px] text-slate-400 font-mono">User bertanya ke AI:</div>
+        <p class="text-xs text-white italic">"Bintang, cariin spot kopi rahasia di Osaka dong yang belum banyak turis."</p>
+      </div>
+    </div>
+
+    <!-- Step 2: AI Processing Indicator -->
+    <div class="journey-step card-glass rounded-2xl p-4 space-y-2">
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span class="px-2 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-md font-bold">STEP 2</span>
+        <span>AI Intent & Gap Ratio</span>
+      </div>
+      <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+        <div class="bg-white/5 p-2 rounded-lg border border-white/5">
+          <div class="text-slate-400">Extracted City</div>
+          <div class="text-white font-bold">Osaka, Japan</div>
+        </div>
+        <div class="bg-white/5 p-2 rounded-lg border border-white/5">
+          <div class="text-slate-400">Gap Score</div>
+          <div class="text-emerald-400 font-bold">88 / 100 (Hidden)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Hybrid Output (Chat Response + Card List) -->
+    <div class="journey-step card-glass rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md font-bold">STEP 3</span>
+        <span>Hybrid Output Result</span>
+      </div>
+      <p class="text-xs text-slate-200">
+        "Nih bro, ada spot kopi hidden gem di Osaka yang tinggi pencarian tapi sedikit videonya!"
+      </p>
+
+      <!-- Spot Recommendation Card -->
+      <div class="bg-black/40 p-3 rounded-xl border border-emerald-500/30 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-white">☕ Kissa Yamatoya (Osaka)</span>
+          <span class="text-[9px] font-mono px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold">GAP SCORE 88</span>
+        </div>
+        <div class="text-[10px] text-slate-400">Pencarian tinggi di TikTok, tapi baru 12 video diunggah. Lengang & tenang.</div>
+        <button class="w-full py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-semibold transition">
+          📍 Lihat di Heatmap Peta
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- POLA 2: LOCATION TRIGGER MAP JOURNEY -->
+  <div id="pola2View" class="hidden space-y-4">
+    <div class="text-xs font-bold text-slate-400 font-mono uppercase tracking-wider flex items-center gap-1.5">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      Journey Flow — Location Trigger Map
+    </div>
+
+    <!-- Step 1: GPS Auto Trigger -->
+    <div class="journey-step card-glass rounded-2xl p-4 space-y-2">
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span class="px-2 py-0.5 bg-white/10 rounded-md text-white font-bold">STEP 1</span>
+        <span>GPS Location Trigger</span>
+      </div>
+      <div class="bg-black/50 p-3 rounded-xl border border-white/5 flex items-center justify-between">
+        <div>
+          <div class="text-[10px] text-slate-400 font-mono">Current Location</div>
+          <div class="text-xs font-bold text-white">Namba, Osaka, Japan</div>
+        </div>
+        <span class="text-[10px] font-mono px-2 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md">GPS ACTIVE</span>
+      </div>
+    </div>
+
+    <!-- Step 2: Interactive Heatmap UI -->
+    <div class="journey-step card-glass rounded-2xl p-4 space-y-3">
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md font-bold">STEP 2</span>
+        <span>Interactive Spot Heatmap</span>
+      </div>
+
+      <!-- Map Mockup Container -->
+      <div class="h-44 bg-slate-900 rounded-xl relative overflow-hidden border border-white/10 flex items-center justify-center">
+        <!-- Grid Pattern Overlay -->
+        <div class="absolute inset-0 opacity-20" style="background-image: radial-gradient(#fff 1px, transparent 1px); background-size: 16px 16px;"></div>
+
+        <!-- Heatmap Marker Green (Hidden Gem) -->
+        <div class="absolute top-10 left-12 group cursor-pointer">
+          <span class="w-6 h-6 bg-emerald-500/40 rounded-full animate-ping absolute"></span>
+          <span class="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-lg shadow-emerald-500/50">88</span>
+          <div class="absolute top-7 left-0 bg-black/80 px-2 py-1 rounded text-[9px] text-emerald-400 font-mono whitespace-nowrap border border-emerald-500/30">Kissa Yamatoya</div>
+        </div>
+
+        <!-- Heatmap Marker Red (Crowded Spot) -->
+        <div class="absolute bottom-12 right-16 group cursor-pointer">
+          <span class="w-6 h-6 bg-red-500/40 rounded-full animate-ping absolute"></span>
+          <span class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-lg shadow-red-500/50">20</span>
+          <div class="absolute top-7 left-0 bg-black/80 px-2 py-1 rounded text-[9px] text-red-400 font-mono whitespace-nowrap border border-red-500/30">Dotonbori Street</div>
+        </div>
+      </div>
+
+      <div class="flex justify-between text-[10px] font-mono text-slate-400 pt-1">
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Hidden Gem (Sepi)</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Turistik (Rame)</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchPola(pola) {
+      const btn1 = document.getElementById('tabPola1');
+      const btn2 = document.getElementById('tabPola2');
+      const view1 = document.getElementById('pola1View');
+      const view2 = document.getElementById('pola2View');
+
+      if (pola === 'pola1') {
+        btn1.className = "flex-1 py-2 rounded-lg bg-[#FF0025] text-white font-bold transition shadow-lg shadow-red-500/20";
+        btn2.className = "flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition";
+        view1.classList.remove('hidden');
+        view2.classList.add('hidden');
+      } else {
+        btn2.className = "flex-1 py-2 rounded-lg bg-[#FF0025] text-white font-bold transition shadow-lg shadow-red-500/20";
+        btn1.className = "flex-1 py-2 rounded-lg text-slate-400 hover:text-white transition";
+        view2.classList.remove('hidden');
+        view1.classList.add('hidden');
+      }
+    }
+  </script>
+
+</body>
+</html>

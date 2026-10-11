@@ -31,3 +31,64 @@ h1, h2, h3, .font-heading {
   70% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
   100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
+
+/* Telkomsel THE v2.0 Deep Dark Mode Harmonization & Border Fixes */
+.dark {
+  color-scheme: dark;
+}
+.dark body {
+  background-color: #071124;
+  color: #f8fafc;
+}
+.dark .bg-white,
+.dark .bg-\[\#F0F4F9\],
+.dark .bg-\[\#F4F6FB\],
+.dark .bg-slate-50,
+.dark .bg-slate-100,
+.dark .bg-slate-200,
+.dark .bg-slate-300,
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark .bg-gray-200,
+.dark .bg-gray-300,
+.dark .bg-zinc-50,
+.dark .bg-zinc-100,
+.dark .bg-zinc-200,
+.dark .bg-neutral-50,
+.dark .bg-neutral-100,
+.dark .bg-neutral-200,
+.dark [class*="bg-white"],
+.dark [class*="bg-slate-"],
+.dark [class*="bg-gray-"],
+.dark [class*="bg-zinc-"],
+.dark [class*="bg-neutral-"],
+.dark [class*="bg-\[\#F"] {
+  background-color: #0A1937 !important;
+  color: #f8fafc !important;
+}
+.dark .text-\[\#0A1937\],
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #f8fafc !important;
+}
+.dark .border-slate-200,
+.dark .border-\[\#001A41\],
+.dark .border-slate-100,
+.dark .border-blue-300,
+.dark [class*="border-slate-"],
+.dark [class*="border-gray-"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #0A1937 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #94a3b8 !important;
+}

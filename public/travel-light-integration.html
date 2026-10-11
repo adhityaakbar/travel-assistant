@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Assistant — Light Mode Dashboard Integration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              red: '#FF0025',
+              navy: '#001A41',
+              orange: '#FDA22B',
+              bgLight: '#F8FAFC',
+              cardLight: '#FFFFFF',
+              borderLight: '#E2E8F0',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #F1F5F9; color: #0F172A; font-family: "Plus Jakarta Sans", sans-serif; }
+    
+    /* UI-UX Pro-Max Pulse Dot (Light Mode Vercel/Linear Style) */
+    .pulse-dot-emerald {
+      position: relative;
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      background-color: #10B981;
+      border-radius: 9999px;
+    }
+    .pulse-dot-emerald::after {
+      content: '';
+      position: absolute;
+      top: -3.5px;
+      left: -3.5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      background-color: rgba(16, 185, 129, 0.35);
+      animation: vercelPulseLight 2s infinite ease-out;
+    }
+
+    .pulse-dot-red {
+      position: relative;
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      background-color: #FF0025;
+      border-radius: 9999px;
+    }
+    .pulse-dot-red::after {
+      content: '';
+      position: absolute;
+      top: -3.5px;
+      left: -3.5px;
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      background-color: rgba(255, 0, 37, 0.35);
+      animation: vercelPulseLight 2s infinite ease-out;
+    }
+
+    @keyframes vercelPulseLight {
+      0% { transform: scale(0.8); opacity: 0.9; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+
+    /* Soft Subtle Outer Glow for Light Theme */
+    .glow-card-emerald {
+      box-shadow: 0 4px 20px -2px rgba(16, 185, 129, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 flex items-center justify-center p-0 sm:p-4">
+
+  <!-- LIGHT MODE MOBILE CONTAINER MATCHING APP.JSX EXACT FRAME -->
+  <div class="w-full max-w-[430px] h-[100dvh] sm:h-[860px] bg-[#F8FAFC] sm:border sm:border-slate-200 sm:rounded-[36px] shadow-2xl flex flex-col overflow-hidden relative">
+
+    <!-- TOP HEADER LIGHT MODE (EXACT FROM APP.JSX LIGHT CLASS) -->
+    <header class="px-4 pt-3.5 pb-2.5 bg-white/90 backdrop-blur-md border-b border-slate-200/80 flex items-center justify-between z-20 shrink-0 shadow-xs">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FF0025] to-[#FDA22B] flex items-center justify-center text-white shadow-xs font-bold text-xs">
+          🧳
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-base font-extrabold text-[#001A41] tracking-tight leading-tight">Travel Assistant</span>
+            <span class="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-600 rounded-md border border-red-500/20">🇯🇵 JP</span>
+          </div>
+          <div class="text-[10px] text-slate-500 font-mono font-medium -mt-0.5">v1.6.0 • Light Mode</div>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-1.5">
+        <span class="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-full text-[10px] font-mono text-slate-700 font-bold flex items-center gap-1.5">
+          <span class="pulse-dot-emerald"></span>
+          <span>Osaka</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- MAIN VIEWPORT LIGHT MODE -->
+    <main class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4 pb-20">
+      
+      <!-- Section Title Light Mode -->
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-xl font-extrabold text-[#001A41]">Kalcer & Spot Trend</h1>
+          <p class="text-xs text-slate-500">Rekomendasi spot tersembunyi & TikTok Trend Gap</p>
+        </div>
+        <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+          Live Map
+        </span>
+      </div>
+
+      <!-- Category Filter Pills Light Mode -->
+      <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs font-mono">
+        <button class="px-3 py-1.5 bg-[#FF0025] text-white font-bold rounded-xl shadow-xs whitespace-nowrap">
+          🔥 TikTok Gap
+        </button>
+        <button class="px-3 py-1.5 bg-white text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 whitespace-nowrap shadow-xs">
+          ☕ Kafe Kalcer
+        </button>
+        <button class="px-3 py-1.5 bg-white text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 whitespace-nowrap shadow-xs">
+          🛍️ Belanja
+        </button>
+      </div>
+
+      <!-- Light Mode Heatmap Radar Widget Container -->
+      <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🗺️</span>
+            <div>
+              <div class="text-sm font-bold text-[#001A41]">TikTok Trend Gap Radar</div>
+              <div class="text-[10px] text-slate-500 font-mono">Pencarian Tinggi vs Video Sedikit</div>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200 font-bold">14 Spot</span>
+        </div>
+
+        <!-- Heatmap Map Canvas Light Theme -->
+        <div class="h-48 bg-slate-50 rounded-xl relative overflow-hidden border border-slate-200 flex items-center justify-center">
+          <div class="absolute inset-0 opacity-25" style="background-image: radial-gradient(#64748b 1px, transparent 1px); background-size: 16px 16px;"></div>
+
+          <!-- Spot Node 1 (Hidden Gem Light Pill) -->
+          <div class="absolute top-10 left-10 cursor-pointer">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-emerald-300 rounded-full shadow-md text-[10px] font-mono">
+              <span class="pulse-dot-emerald"></span>
+              <span class="text-emerald-800 font-bold">Kissa Yamatoya</span>
+              <span class="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded font-bold">88</span>
+            </div>
+          </div>
+
+          <!-- Spot Node 2 (Crowded Light Pill) -->
+          <div class="absolute bottom-12 right-12 cursor-pointer">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-red-300 rounded-full shadow-md text-[10px] font-mono">
+              <span class="pulse-dot-red"></span>
+              <span class="text-red-700 font-bold">Dotonbori</span>
+              <span class="px-1.5 py-0.2 bg-red-100 text-red-700 rounded font-bold">20</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spot Feed Light Mode Cards -->
+      <div class="space-y-2">
+        <div class="text-[11px] font-mono font-bold text-slate-500 uppercase">Spot rekomendasi teratas:</div>
+
+        <div class="bg-white border border-slate-200 rounded-2xl p-3.5 flex items-center justify-between hover:border-emerald-400 transition shadow-xs">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-bold text-[#001A41]">☕ Kissa Yamatoya</span>
+              <span class="px-2 py-0.5 text-[9px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md font-bold">SCORE 88</span>
+            </div>
+            <p class="text-xs text-slate-500">Namba, Osaka • Kedai Kopi Retro Sepi Turis</p>
+          </div>
+          <button class="px-3 py-1.5 bg-gradient-to-r from-[#FF0025] to-[#FDA22B] text-white text-xs font-bold rounded-xl shadow-xs">
+            Detail
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- FIXED BOTTOM NAVBAR LIGHT MODE (EXACT MATCH APP.JSX LIGHT CLASS) -->
+    <nav class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200/80 py-2.5 px-6 flex justify-between items-center text-[10px] font-mono text-slate-500 z-30 shadow-lg">
+      <button class="flex flex-col items-center gap-1 hover:text-slate-900 transition">
+        <span class="text-sm">💱</span>
+        <span>Valas</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 hover:text-slate-900 transition">
+        <span class="text-sm">📷</span>
+        <span>Scanner</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 hover:text-slate-900 transition">
+        <span class="text-sm">💬</span>
+        <span>Ngobrol</span>
+      </button>
+      <button class="flex flex-col items-center gap-1 text-[#FF0025] font-bold transition">
+        <span class="text-sm">📍</span>
+        <span>Kalcer</span>
+      </button>
+    </nav>
+
+  </div>
+
+</body>
+</html>

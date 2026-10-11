@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-const appSecret = process.env.APP_SECRET || 'dev-app-secret-placeholder';
-const jwtSecret = process.env.JWT_SECRET || 'dev-jwt-secret-placeholder';
+const appSecret = process.env.APP_SECRET || 'guardian8';
+const jwtSecret = process.env.JWT_SECRET || 'travel_assistant_japan_secret_key_2026';
 
 export function createToken(secret) {
   if (secret !== appSecret) return null;
